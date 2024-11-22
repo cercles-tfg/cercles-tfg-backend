@@ -23,6 +23,8 @@ public class GoogleAuthService {
 
     public GoogleAuthService(UsuarioRepository usuarioRepository) throws GeneralSecurityException, IOException {
         this.usuarioRepository = usuarioRepository;
+
+        // Configurar el GoogleIdTokenVerifier una vez en el constructor
         this.verifier = new GoogleIdTokenVerifier.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
                 GsonFactory.getDefaultInstance()
@@ -31,13 +33,20 @@ public class GoogleAuthService {
                 .build();
     }
 
-    public String obtenerCorreoDesdeToken(String googleToken) throws GeneralSecurityException, IOException {
-        GoogleIdToken idToken = verifier.verify(googleToken);
-        if (idToken != null) {
-            GoogleIdToken.Payload payload = idToken.getPayload();
-            return payload.getEmail();
+    public String obtenerCorreoDesdeToken(String googleToken) {
+        try {
+            // Utiliza el verificador que ya está configurado en el constructor
+            GoogleIdToken idToken = verifier.verify(googleToken);
+            if (idToken != null) {
+                GoogleIdToken.Payload payload = idToken.getPayload();
+                String email = payload.getEmail();
+                return email;
+            } else {
+                throw new IllegalArgumentException("Token de Google no válido.");
+            }
+        } catch (GeneralSecurityException | IOException e) {
+            throw new RuntimeException("Error al validar el token de Google: " + e.getMessage(), e);
         }
-        return null; // Token no válido
     }
 
     public boolean usuarioExiste(String correo) {

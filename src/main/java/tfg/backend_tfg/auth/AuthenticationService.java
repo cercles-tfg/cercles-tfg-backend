@@ -39,7 +39,7 @@ public class AuthenticationService {
                     .build();
         } else {
             throw new IllegalArgumentException("Rol desconocido");
-        }
+        }        
 
         usuarioRepository.save(usuario);
         var jwtToken = jwtService.generateToken(usuario);
@@ -47,19 +47,15 @@ public class AuthenticationService {
     }
 
     // Método para autenticar con Google
-    public AuthenticationResponse authenticate(String googleToken) {
-        try {
-            // Verificar el token de Google y obtener el correo
-            String email = googleAuthService.obtenerCorreoDesdeToken(googleToken);
-            if (email == null || !googleAuthService.usuarioExiste(email)) {
-                throw new IllegalArgumentException("Token de Google no válido o el usuario no está registrado.");
-            }
-            var usuario = usuarioRepository.findByCorreo(email)
-                    .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-            var jwtToken = jwtService.generateToken(usuario);
-            return new AuthenticationResponse(jwtToken); // Cambiar builder por constructor
-        } catch (GeneralSecurityException | IOException e) {
-            throw new RuntimeException("Error al validar el token de Google: " + e.getMessage());
+    public AuthenticationResponse authenticate(String googleToken) throws GeneralSecurityException, IOException {
+        // Verificar el token de Google y obtener el correo
+        String email = googleAuthService.obtenerCorreoDesdeToken(googleToken);
+        if (email == null || !googleAuthService.usuarioExiste(email)) {
+            throw new IllegalArgumentException("Token de Google no válido o el usuario no está registrado.");
         }
+        var usuario = usuarioRepository.findByCorreo(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        var jwtToken = jwtService.generateToken(usuario);
+        return new AuthenticationResponse(jwtToken); // Cambiar builder por constructor
     }
 }

@@ -83,7 +83,6 @@ public abstract class Usuario implements UserDetails {
         return true;
     }
 
-    // Necesitas definir cómo manejar las contraseñas para Spring Security:
     @Override
     public String getPassword() {
         return null; // Asumimos que se usará autenticación con Google.

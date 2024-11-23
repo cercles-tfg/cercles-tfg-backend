@@ -5,11 +5,13 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import tfg.backend_tfg.repository.UsuarioRepository;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.Collections;
 
 @Service
@@ -21,10 +23,11 @@ public class GoogleAuthService {
     private final UsuarioRepository usuarioRepository;
     private final GoogleIdTokenVerifier verifier;
 
-    public GoogleAuthService(UsuarioRepository usuarioRepository) throws GeneralSecurityException, IOException {
+    public GoogleAuthService(UsuarioRepository usuarioRepository, Environment environment) throws GeneralSecurityException, IOException {
         this.usuarioRepository = usuarioRepository;
+        String clientId = environment.getProperty("google.client.id");
+        System.out.println("Client ID desde Environment: " + clientId);
 
-        // Configurar el GoogleIdTokenVerifier una vez en el constructor
         this.verifier = new GoogleIdTokenVerifier.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
                 GsonFactory.getDefaultInstance()
@@ -37,11 +40,14 @@ public class GoogleAuthService {
         try {
             // Utiliza el verificador que ya está configurado en el constructor
             GoogleIdToken idToken = verifier.verify(googleToken);
+            System.out.println("idToken: " + idToken);
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
                 String email = payload.getEmail();
                 return email;
             } else {
+                System.out.println("Client ID usado para verificar: " + clientId);
+
                 throw new IllegalArgumentException("Token de Google no válido.");
             }
         } catch (GeneralSecurityException | IOException e) {

@@ -22,8 +22,8 @@ import java.util.List;
     property = "rol"
 )
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = Estudiante.class, name = "Estudiante"),
-    @JsonSubTypes.Type(value = Profesor.class, name = "Profesor")
+    @JsonSubTypes.Type(value = Estudiante.class, name = "estudiante"),
+    @JsonSubTypes.Type(value = Profesor.class, name = "profesor")
 })
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -44,18 +44,19 @@ public abstract class Usuario implements UserDetails {
     @Column(nullable = false)
     private String nombre;
 
-    @Column
+    @Column(name = "git_username")
     private String gitUsername;
 
-    @Column
+    @Column(name = "taiga_username")
     private String taigaUsername;
 
     @Enumerated(EnumType.STRING)
-    private Role role;
+    @Column(name = "rol", insertable = false, updatable = false) // Evitamos duplicar la columna con el discriminador
+    private Rol rol;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(role.name()));
+        return List.of(new SimpleGrantedAuthority(rol.name()));
     }
 
     @Override

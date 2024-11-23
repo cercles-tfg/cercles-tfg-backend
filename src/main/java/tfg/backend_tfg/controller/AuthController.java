@@ -30,6 +30,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> payload) {
         String googleToken = payload.get("googleToken");
+        System.out.println("Google tooooken " + googleToken);
         try {
             // Autenticar usando el token proporcionado
             AuthenticationResponse response = authService.authenticate(googleToken);

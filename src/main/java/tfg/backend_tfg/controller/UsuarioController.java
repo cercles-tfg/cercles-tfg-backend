@@ -1,8 +1,10 @@
-/*package tfg.backend_tfg.controller;
+package tfg.backend_tfg.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.UsuarioRepository;
@@ -36,46 +38,47 @@ public class UsuarioController {
         return usuarioService.getUsuarioById(id);
     }
 
-    @PostMapping("/verificar")
-    public Map<String, Boolean> verificarUsuario(@RequestBody Map<String, String> request) {
-        String correo = request.get("correo");
-        boolean existe = usuarioService.existe(correo);
-        return Map.of("existe", existe);
-    }
-
-    @PostMapping("/crear")
-    public ResponseEntity<Usuario> createUsuario(@RequestBody Usuario usuario) {
-        usuarioRepository.save(usuario);
-        return ResponseEntity.ok(usuario);
-    }
-
+    /* 
     @DeleteMapping("/{id}")
     public void deleteUsuario(@PathVariable int id) {
         usuarioService.deleteUsuario(id);
-    }
+    }*/
 
-    @GetMapping("/{email}/datos")
-public ResponseEntity<?> getDatosUsuario(@PathVariable String email) {
-    try {
-        // Buscar el usuario por el correo electrónico proporcionado
-        Optional<Usuario> usuario = usuarioRepository.findByCorreo(email);
-        if (usuario == null) {
-            return ResponseEntity.status(404).body("Usuario no encontrado");
+    @GetMapping("/datos")
+    public ResponseEntity<?> getDatosUsuario() {
+        try {
+            System.out.println("AL MENOS ENTRA");
+            // Obtener la información de autenticación desde el SecurityContextHolder
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body("Usuario no autenticado.");
+            }
+
+            // Obtener el correo del usuario autenticado
+            String email = authentication.getName();
+
+            // Buscar el usuario en la base de datos usando el correo electrónico
+            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+            if (usuarioOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Usuario no encontrado");
+            }
+
+            // Devolver los datos del usuario
+            Usuario usuario = usuarioOpt.get();
+            Map<String, Object> response = new HashMap<>();
+            response.put("nombre", usuario.getNombre());
+            response.put("correo", usuario.getCorreo());
+            response.put("gitUsername", usuario.getGitUsername());
+            response.put("taigaUsername", usuario.getTaigaUsername());
+
+            System.out.println("Datooos " + response);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
         }
-
-        // Devolver los datos del usuario (por ejemplo, el gitUsername)
-        Map<String, Object> response = new HashMap<>();
-        response.put("nombre", usuario.getNombre());
-        response.put("correo", usuario.getCorreo());
-        response.put("gitUsername", usuario.getGitUsername());
-
-        return ResponseEntity.ok(response);
-    } catch (Exception e) {
-        e.printStackTrace();
-        return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
     }
-}
 
 
 }
-*/

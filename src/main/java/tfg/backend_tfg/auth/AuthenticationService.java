@@ -63,6 +63,7 @@ public class AuthenticationService {
         var usuario = usuarioRepository.findByCorreo(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
         var jwtToken = jwtService.generateToken(usuario);
+        System.out.println("token jwt generadoooo: " + jwtToken);
         return new AuthenticationResponse(jwtToken); // Cambiar builder por constructor
     }
 }

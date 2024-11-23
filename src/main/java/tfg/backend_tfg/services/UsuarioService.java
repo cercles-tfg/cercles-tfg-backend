@@ -37,4 +37,5 @@ public class UsuarioService {
     public boolean existe(String correo) {
         return usuarioRepository.findByCorreo(correo) != null;
     }
+
 }

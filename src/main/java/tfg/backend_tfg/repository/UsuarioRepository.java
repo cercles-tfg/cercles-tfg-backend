@@ -9,4 +9,5 @@ import tfg.backend_tfg.model.Usuario;
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     Optional<Usuario> findByCorreo(String correo);
+
 }

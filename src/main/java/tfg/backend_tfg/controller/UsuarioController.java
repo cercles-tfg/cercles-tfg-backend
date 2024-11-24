@@ -11,6 +11,7 @@ import org.springframework.data.util.Pair;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.GithubService;
+import tfg.backend_tfg.services.TaigaService;
 import tfg.backend_tfg.services.UsuarioService;
 
 import java.util.HashMap;
@@ -24,13 +25,15 @@ public class UsuarioController {
 
     private final UsuarioService usuarioService;
     private final GithubService githubService;
+    private final TaigaService taigaService;
     @Autowired
     private final UsuarioRepository usuarioRepository;
 
-    public UsuarioController(UsuarioService usuarioService, UsuarioRepository usuarioRepository, GithubService githubService) {
+    public UsuarioController(UsuarioService usuarioService, UsuarioRepository usuarioRepository, GithubService githubService, TaigaService taigaService) {
         this.usuarioService = usuarioService;
         this.usuarioRepository = usuarioRepository;
         this.githubService = githubService;
+        this.taigaService = taigaService;
     }
 
     @GetMapping
@@ -131,6 +134,63 @@ public class UsuarioController {
             return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
         }
     }
+
+
+    @PostMapping("/taiga/connect")
+public ResponseEntity<?> connectTaiga(@RequestBody Map<String, String> requestBody) {
+    try {
+        // Obtener la información de autenticación desde el SecurityContextHolder
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(403).body("Usuario no autenticado.");
+        }
+
+        // Obtener el correo del usuario autenticado
+        String email = authentication.getName();
+
+        // Buscar el usuario en la base de datos usando el correo electrónico
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuario no encontrado");
+        }
+
+        Usuario usuario = usuarioOpt.get();
+
+        // Intentar autenticar el usuario con Taiga usando username/password o GitHub token
+        String taigaAuthToken = null;
+
+        if (requestBody.containsKey("username") && requestBody.containsKey("password")) {
+            // Autenticación con username y password
+            String taigaUsername = requestBody.get("username");
+            String taigaPassword = requestBody.get("password");
+            taigaAuthToken = taigaService.authenticateTaigaUser(taigaUsername, taigaPassword);
+
+            if (taigaAuthToken != null) {
+                usuario.setTaigaUsername(taigaUsername);
+            }
+
+        } else if (requestBody.containsKey("githubAccessToken")) {
+            // Autenticación con GitHub access token
+            String githubAccessToken = requestBody.get("githubAccessToken");
+            taigaAuthToken = taigaService.authenticateTaigaUserWithGitHub(githubAccessToken);
+        }
+
+        if (taigaAuthToken == null) {
+            return ResponseEntity.status(401).body("No se pudo autenticar al usuario en Taiga.");
+        }
+
+        // Actualizar el usuario con el taigaAccessToken obtenido
+        usuario.setTaigaAccessToken(taigaAuthToken);
+        usuarioRepository.save(usuario);
+
+        return ResponseEntity.ok("Cuenta de Taiga asociada exitosamente");
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
+    }
+}
+
+
 
 
 

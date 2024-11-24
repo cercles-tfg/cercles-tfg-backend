@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.data.util.Pair;
+
 
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.UsuarioRepository;
@@ -103,20 +105,24 @@ public class UsuarioController {
 
             // Obtener el código de autorización de GitHub
             String code = requestBody.get("code");
-            System.out.println("codee" + code);
+            System.out.println("codee: " + code);
             if (code == null || code.isEmpty()) {
                 return ResponseEntity.status(400).body("Código de GitHub no proporcionado");
             }
 
-            // Obtener el nombre de usuario de GitHub usando el código
-            String githubUsername = githubService.obtenerNombreUsuarioGitHub(code);
-            if (githubUsername == null) {
-                return ResponseEntity.status(500).body("No se pudo obtener el nombre de usuario de GitHub.");
+            // Obtener el nombre de usuario de GitHub y el access token usando el código
+            Pair<String, String> githubData = githubService.obtenerNombreUsuarioGitHub(code);
+            if (githubData == null) {
+                return ResponseEntity.status(500).body("No se pudo obtener el nombre de usuario o el access token de GitHub.");
             }
 
-            // Actualizar el usuario con el gitUsername obtenido
+            String githubUsername = githubData.getFirst();
+            String accessToken = githubData.getSecond();
+
+            // Actualizar el usuario con el gitUsername y accessToken obtenido
             Usuario usuario = usuarioOpt.get();
             usuario.setGitUsername(githubUsername);
+            usuario.setGithubAccessToken(accessToken);
             usuarioRepository.save(usuario);
 
             return ResponseEntity.ok("Cuenta de GitHub asociada exitosamente");
@@ -125,6 +131,7 @@ public class UsuarioController {
             return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
         }
     }
+
 
 
 

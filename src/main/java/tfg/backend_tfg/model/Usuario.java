@@ -54,6 +54,8 @@ public abstract class Usuario implements UserDetails {
     @Column(name = "rol", insertable = false, updatable = false) // Evitamos duplicar la columna con el discriminador
     private Rol rol;
 
+    private String githubAccessToken;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(rol.name()));
@@ -87,5 +89,13 @@ public abstract class Usuario implements UserDetails {
     @Override
     public String getPassword() {
         return null; // Asumimos que se usará autenticación con Google.
+    }
+
+    public String getGithubAccessToken() {
+        return githubAccessToken;
+    }
+
+    public void setGithubAccessToken(String accessToken) {
+        this.githubAccessToken = accessToken;
     }
 }

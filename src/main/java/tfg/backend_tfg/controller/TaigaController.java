@@ -2,16 +2,14 @@ package tfg.backend_tfg.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import tfg.backend_tfg.model.GitHubUserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.UsuarioRepository;
-import tfg.backend_tfg.services.GithubService;
 import tfg.backend_tfg.services.TaigaService;
 
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -27,8 +25,8 @@ public class TaigaController {
         this.usuarioRepository = usuarioRepository;
     }
 
-    @GetMapping("/detalles")
-    public ResponseEntity<?> obtenerDetallesTaiga() {
+    @PostMapping("/connect")
+    public ResponseEntity<?> connectTaiga(@RequestBody Map<String, String> requestBody) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -38,22 +36,45 @@ public class TaigaController {
             String email = authentication.getName();
             Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
             if (usuarioOpt.isEmpty()) {
-                return ResponseEntity.status(404).body("Usuario no encontrado");
+                return ResponseEntity.status(404).body("Usuario no encontrado.");
             }
 
             Usuario usuario = usuarioOpt.get();
-            String accessToken = usuario.getTaigaAccessToken();
-            if (accessToken == null || accessToken.isEmpty()) {
-                return ResponseEntity.status(400).body("No se ha encontrado un access token de Taiga asociado.");
+            String taigaAuthToken = null;
+
+            if ("normal".equals(requestBody.get("type"))) {
+                String username = requestBody.get("username");
+                String password = requestBody.get("password");
+
+                if (username == null || password == null) {
+                    return ResponseEntity.status(400).body("Faltan credenciales.");
+                }
+
+                taigaAuthToken = taigaService.authenticateTaigaUser(username, password);
+                if (taigaAuthToken != null) {
+                    usuario.setTaigaUsername(username);
+                }
+
+            } else if ("github".equals(requestBody.get("type"))) {
+                String code = requestBody.get("code");
+                if (code == null) {
+                    return ResponseEntity.status(400).body("Falta el código de GitHub.");
+                }
+
+                taigaAuthToken = taigaService.authenticateTaigaUserWithGitHub(code);
             }
 
-            // Llamar al servicio para obtener detalles adicionales del usuario de Taiga
-            // Por ahora, podrías simplemente devolver el token o hacer alguna llamada a Taiga.
+            if (taigaAuthToken == null) {
+                return ResponseEntity.status(401).body("No se pudo autenticar al usuario en Taiga.");
+            }
 
-            return ResponseEntity.ok("Detalles obtenidos exitosamente.");
+            usuario.setTaigaAccessToken(taigaAuthToken);
+            usuarioRepository.save(usuario);
+
+            return ResponseEntity.ok("Cuenta de Taiga asociada exitosamente.");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error interno del servidor.");
         }
     }
 }

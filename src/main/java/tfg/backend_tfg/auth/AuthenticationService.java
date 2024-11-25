@@ -46,7 +46,7 @@ public class AuthenticationService {
 
         usuarioRepository.save(usuario);
         var jwtToken = jwtService.generateToken(usuario);
-        return new AuthenticationResponse(jwtToken); // Cambiar builder por constructor
+        return new AuthenticationResponse(jwtToken, null); // TODO
     }
 
     // Método para autenticar con Google
@@ -64,6 +64,6 @@ public class AuthenticationService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
         var jwtToken = jwtService.generateToken(usuario);
         System.out.println("token jwt generadoooo: " + jwtToken);
-        return new AuthenticationResponse(jwtToken); // Cambiar builder por constructor
+        return new AuthenticationResponse(jwtToken, usuario.getRol()); // Cambiar builder por constructor
     }
 }

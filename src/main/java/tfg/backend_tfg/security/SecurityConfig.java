@@ -34,12 +34,12 @@ public class SecurityConfig {
                 return corsConfig;
             }))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // Permitir acceso sin autenticación a los endpoints de autenticación
+                .requestMatchers("/api/auth/**").permitAll() // Permitir acceso sin autenticación 
                 .anyRequest().authenticated() // Requerir autenticación para cualquier otra solicitud
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider)
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); // Añadir el filtro JWT antes del UsernamePasswordAuthenticationFilter
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

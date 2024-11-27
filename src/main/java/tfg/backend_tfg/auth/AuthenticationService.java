@@ -25,6 +25,7 @@ public class AuthenticationService {
     @Autowired
     private final GoogleAuthService googleAuthService;
 
+    /* 
     // Registro de usuarios (permite el registro de Estudiantes o Profesores)
     public AuthenticationResponse registro(RegisterRequest request) {
         Usuario usuario;
@@ -47,7 +48,7 @@ public class AuthenticationService {
         usuarioRepository.save(usuario);
         var jwtToken = jwtService.generateToken(usuario);
         return new AuthenticationResponse(jwtToken, null); // TODO
-    }
+    }*/
 
     // Método para autenticar con Google
     public AuthenticationResponse authenticate(String googleToken) throws GeneralSecurityException, IOException {

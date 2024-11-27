@@ -1,5 +1,15 @@
 package tfg.backend_tfg.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,11 +26,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
 import tfg.backend_tfg.dto.CursoDetalleDTO;
 import tfg.backend_tfg.dto.CursoSummaryDTO;
 import tfg.backend_tfg.model.Curso;
@@ -36,12 +41,6 @@ import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.UsuarioService;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/cursos")
@@ -191,9 +190,51 @@ public class CursoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('profesor')")
-    @PostMapping("/desactivar")
-    public ResponseEntity<?> desactivarCurso(@RequestBody CursoRequest cursoRequest) {
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    @PostMapping("/cambiarEstado")
+    public ResponseEntity<?> cambiarEstadoCurso(@RequestBody CursoRequest cursoRequest) {
+        try {
+            // Obtener la información de autenticación desde el SecurityContextHolder
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+            }
+
+            Optional<Curso> cursoExistente;
+
+            // Intentar buscar el curso por ID si se proporciona en la solicitud
+            if (cursoRequest.getId() != null && cursoRequest.getId() != 0) {
+                cursoExistente = cursoRepository.findById(cursoRequest.getId());
+            }
+             else {
+                // Buscar el curso por nombreAsignatura, añoInicio y cuatrimestre si no se proporciona ID
+                cursoExistente = cursoRepository.findByNombreAsignaturaAndAñoInicioAndCuatrimestreAndActivo(
+                        cursoRequest.getNombreAsignatura(), cursoRequest.getAñoInicio(), cursoRequest.getCuatrimestre(), true);
+            }
+
+            // Verificar si el curso existe
+            if (cursoExistente.isPresent()) {
+                Curso curso = cursoExistente.get();
+
+                // Cambiar el estado de activo a su contrario
+                curso.setActivo(!curso.isActivo());
+                cursoRepository.save(curso);
+                    
+                String estado = curso.isActivo() ? "activado" : "desactivado";
+                return ResponseEntity.ok("Curso " + estado + " exitosamente");
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Curso no encontrado");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al cambiar el estado del curso: " + e.getMessage());
+        }
+    }
+
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    @PostMapping("/verificarCursoExistente")
+    public ResponseEntity<?> verificarCursoExistente(@RequestBody CursoRequest cursoRequest) {
         try {
             // Obtener la información de autenticación desde el SecurityContextHolder
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -205,19 +246,21 @@ public class CursoController {
                     cursoRequest.getNombreAsignatura(), cursoRequest.getAñoInicio(), cursoRequest.getCuatrimestre(), true);
 
             if (cursoExistente.isPresent()) {
-                Curso curso = cursoExistente.get();
-                curso.setActivo(false);
-                cursoRepository.save(curso);
-                return ResponseEntity.ok("Curso desactivado exitosamente");
+                // Si ya existe un curso similar activo, devolver una respuesta especial
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body("Curso activo ya existente. ¿Desea desactivarlo?");
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Curso no encontrado o ya está desactivado");
+                return ResponseEntity.ok("No hay conflicto");
             }
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al desactivar el curso: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al verificar el curso existente: " + e.getMessage());
         }
     }
+
+
+
 
     @GetMapping
     @PreAuthorize("hasAuthority('PROFESOR')")
@@ -287,6 +330,10 @@ public class CursoController {
                     .map(estudianteCurso -> estudianteCurso.getEstudiante().getNombre())
                     .toList();
 
+            List<String> correosEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
+                    .map(estudianteCurso -> estudianteCurso.getEstudiante().getCorreo())
+                    .toList();
+
             // Obtener los nombres de los profesores asociados al curso
             List<String> nombresProfesores = curso.getProfesores().stream()
                     .map(Profesor::getNombre)
@@ -300,6 +347,7 @@ public class CursoController {
                     curso.getCuatrimestre(),
                     curso.isActivo(),
                     nombresEstudiantes,
+                    correosEstudiantes,
                     nombresProfesores
             );
 

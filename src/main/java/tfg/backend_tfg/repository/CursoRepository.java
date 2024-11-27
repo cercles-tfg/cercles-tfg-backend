@@ -11,7 +11,10 @@ import tfg.backend_tfg.model.Profesor;
 @Repository
 public interface CursoRepository extends JpaRepository<Curso, Integer> {
     Optional<Curso> findByNombreAsignaturaAndAñoInicioAndCuatrimestreAndActivo(
-            String nombreAsignatura, int añoInicio, int cuatrimestre, boolean activo);
+        String nombreAsignatura, int añoInicio, int cuatrimestre, boolean activo);
+
+    Optional<Curso> findByNombreAsignaturaAndAñoInicioAndCuatrimestre(
+        String nombreAsignatura, int añoInicio, int cuatrimestre);
 
     List<Curso> findAllByProfesoresContaining(Profesor profesor);
 }

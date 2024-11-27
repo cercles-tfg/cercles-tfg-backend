@@ -3,6 +3,7 @@ package tfg.backend_tfg.model;
 import java.util.List;
 
 public class CursoRequest {
+    private int id;
     private String nombreAsignatura;
     private int añoInicio;
     private int cuatrimestre;
@@ -11,6 +12,10 @@ public class CursoRequest {
     private List<Integer> profesores;
 
     // Getters y setters
+    public Integer getId() {
+        return id;
+    }
+    
     public String getNombreAsignatura() {
         return nombreAsignatura;
     }

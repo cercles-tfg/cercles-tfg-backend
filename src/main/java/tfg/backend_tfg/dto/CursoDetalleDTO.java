@@ -12,15 +12,17 @@ public class CursoDetalleDTO {
     private int cuatrimestre;
     private boolean activo;
     private List<String> nombresEstudiantes;
+    private List<String> correosEstudiantes;
     private List<String> nombresProfesores;
 
-    public CursoDetalleDTO(int id, String nombreAsignatura, int añoInicio, int cuatrimestre, boolean activo, List<String> nombresEstudiantes, List<String> nombresProfesores) {
+    public CursoDetalleDTO(int id, String nombreAsignatura, int añoInicio, int cuatrimestre, boolean activo, List<String> nombresEstudiantes, List<String> correosEstudiantes, List<String> nombresProfesores) {
         this.id = id;
         this.nombreAsignatura = nombreAsignatura;
         this.añoInicio = añoInicio;
         this.cuatrimestre = cuatrimestre;
         this.activo = activo;
         this.nombresEstudiantes = nombresEstudiantes;
+        this.correosEstudiantes = correosEstudiantes;
         this.nombresProfesores = nombresProfesores;
     }
 }

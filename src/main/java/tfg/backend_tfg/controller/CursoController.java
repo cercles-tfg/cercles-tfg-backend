@@ -20,6 +20,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +35,7 @@ import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.EstudianteRequest;
 import tfg.backend_tfg.model.Profesor;
+import tfg.backend_tfg.model.ProfesorRequest;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
@@ -358,6 +360,187 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los detalles del curso.");
         }
     }
+
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    @PutMapping("/{id}/modificar_curso")
+    public ResponseEntity<?> modificarCurso(@PathVariable Integer id, @RequestBody CursoRequest cursoRequest) {
+        try {
+            // Validar autenticación del usuario
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+            }
+    
+            // Buscar el curso por ID
+            Optional<Curso> cursoExistenteOpt = cursoRepository.findById(id);
+            if (!cursoExistenteOpt.isPresent()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Curso no encontrado.");
+            }
+    
+            Curso cursoExistente = cursoExistenteOpt.get();
+    
+            // Modificar datos básicos del curso
+            ResponseEntity<?> response = modificarDatosCurso(cursoExistente, cursoRequest);
+            if (response.getStatusCode() != HttpStatus.OK) {
+                return response;
+            }
+    
+            // Añadir estudiantes al curso
+            response = añadirEstudiantes(cursoExistente, cursoRequest.getEstudiantesAñadir());
+            if (response.getStatusCode() != HttpStatus.OK) {
+                return response;
+            }
+
+            // Borrar estudiantes del curso
+            borrarEstudiantes(cursoExistente, cursoRequest.getEstudiantesBorrar());
+    
+            // Añadir profesores al curso
+            añadirProfesores(cursoExistente, cursoRequest.getProfesoresAñadir());
+    
+            // Guardar los cambios finales del curso
+            cursoRepository.save(cursoExistente);
+    
+            return ResponseEntity.ok("Curso modificado exitosamente.");
+    
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al modificar el curso: " + e.getMessage());
+        }
+    }
+    
+    // Función para modificar los datos básicos del curso
+    private ResponseEntity<?> modificarDatosCurso(Curso cursoExistente, CursoRequest cursoRequest) {
+        if (!cursoExistente.getNombreAsignatura().equals(cursoRequest.getNombreAsignatura()) ||
+            cursoExistente.getAñoInicio() != cursoRequest.getAñoInicio() ||
+            cursoExistente.getCuatrimestre() != cursoRequest.getCuatrimestre()) {
+    
+            Optional<Curso> cursoConflicto = cursoRepository.findByNombreAsignaturaAndAñoInicioAndCuatrimestreAndActivo(
+                cursoRequest.getNombreAsignatura(), cursoRequest.getAñoInicio(), cursoRequest.getCuatrimestre(), true
+            );
+    
+            if (cursoConflicto.isPresent() && cursoConflicto.get().getId() != (cursoExistente.getId())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Ya existe un curso activo con el mismo nombre, año y cuatrimestre.");
+            }
+        }
+    
+        // Actualizar los datos básicos
+        cursoExistente.setNombreAsignatura(cursoRequest.getNombreAsignatura());
+        cursoExistente.setAñoInicio(cursoRequest.getAñoInicio());
+        cursoExistente.setCuatrimestre(cursoRequest.getCuatrimestre());
+    
+        return ResponseEntity.ok().build();
+    }
+    
+    
+    // Función para añadir estudiantes al curso
+    private ResponseEntity<?> añadirEstudiantes(Curso cursoExistente, List<EstudianteRequest> estudiantesAñadir) {
+        for (EstudianteRequest estudianteRequest : estudiantesAñadir) {
+            Usuario usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
+            if (usuarioExistente == null) {
+                // Llamar al servicio para crear el usuario
+                UsuarioRequest usuarioRequest = new UsuarioRequest();
+                usuarioRequest.setCorreo(estudianteRequest.getCorreo());
+                usuarioRequest.setNombre(estudianteRequest.getNombre());
+                usuarioRequest.setRol(Rol.Estudiante);
+
+                ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
+
+                if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Error al crear el estudiante: " + estudianteRequest.getCorreo());
+                }
+
+                usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
+            }
+            // Asociar al estudiante con el curso
+            EstudianteCurso estudianteCurso = new EstudianteCurso((Estudiante) usuarioExistente, cursoExistente);
+            estudianteCursoRepository.save(estudianteCurso);
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    
+    
+    // Función para borrar estudiantes del curso
+    private void borrarEstudiantes(Curso cursoExistente, List<EstudianteRequest> estudiantesBorrar) {
+        for (EstudianteRequest estudianteRequest : estudiantesBorrar) {
+            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(estudianteRequest.getCorreo());
+
+            if (usuarioOpt.isPresent() && usuarioOpt.get() instanceof Estudiante) {
+                Estudiante estudiante = (Estudiante) usuarioOpt.get();
+
+                // Eliminar la relación entre el estudiante y el curso
+                Optional<EstudianteCurso> estudianteCursoOpt = estudianteCursoRepository.findByEstudianteAndCurso(estudiante, cursoExistente);
+                if (estudianteCursoOpt.isPresent()) {
+                    estudianteCursoRepository.delete(estudianteCursoOpt.get());
+                }
+
+                // Verificar si el estudiante no está en ningún otro curso
+                List<EstudianteCurso> cursosDelEstudiante = estudianteCursoRepository.findByEstudianteId(estudiante.getId());
+                if (cursosDelEstudiante.isEmpty()) {
+                    usuarioRepository.delete(estudiante);
+                }
+            }
+        }
+    }
+
+
+
+    // Función para añadir profesores al curso
+    private ResponseEntity<?> añadirProfesores(Curso cursoExistente, List<ProfesorRequest> profesoresAñadir) {
+        for (ProfesorRequest profesorRequest : profesoresAñadir) {
+            Usuario usuarioExistente = usuarioRepository.findByCorreo(profesorRequest.getCorreo()).orElse(null);
+            
+            if (usuarioExistente == null) {
+                // Llamar al servicio para crear el usuario
+                UsuarioRequest usuarioRequest = new UsuarioRequest();
+                usuarioRequest.setCorreo(profesorRequest.getCorreo());
+                usuarioRequest.setNombre(profesorRequest.getNombre());
+                usuarioRequest.setRol(Rol.Profesor);
+
+                ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
+                System.out.println("usuario creado " + usuarioRequest.getNombre());
+
+                if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Error al crear el profesor: " + profesorRequest.getCorreo());
+                }
+
+                usuarioExistente = usuarioRepository.findByCorreo(profesorRequest.getCorreo()).orElse(null);
+            }
+
+            boolean what = cursoExistente.getProfesores().contains(usuarioExistente);
+            System.out.println("QUee "+ what);
+            // Asociar al profesor con el curso si no está ya asociado
+            if (!what) {
+                cursoExistente.getProfesores().add((Profesor) usuarioExistente);
+                System.out.println("usuario asociado " + usuarioExistente.getNombre());
+            }
+            //cursoExistente.setProfesores(profesores);
+            //cursoRepository.save(curso);
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    // Función para borrar profesores del curso
+    private void borrarProfesores(Curso cursoExistente, List<ProfesorRequest> profesoresBorrar) {
+        for (ProfesorRequest profesorRequest : profesoresBorrar) {
+            // Buscar al profesor por correo
+            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(profesorRequest.getCorreo());
+
+            if (usuarioOpt.isPresent() && usuarioOpt.get() instanceof Profesor) {
+                Profesor profesor = (Profesor) usuarioOpt.get();
+
+                // Verificar si el profesor está asociado al curso actual
+                if (cursoExistente.getProfesores().contains(profesor)) {
+                    // Eliminar la relación entre el profesor y el curso
+                    cursoExistente.getProfesores().remove(profesor);
+                    System.out.println("Relación eliminada con el profesor: " + profesor.getNombre());
+                }
+            }
+        }
+    }
+
 
 
 

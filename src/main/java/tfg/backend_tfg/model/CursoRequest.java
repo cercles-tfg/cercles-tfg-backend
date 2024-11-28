@@ -11,6 +11,13 @@ public class CursoRequest {
     private List<EstudianteRequest> estudiantes;
     private List<Integer> profesores;
 
+    private List<EstudianteRequest> estudiantesAñadir;
+    private List<EstudianteRequest> estudiantesBorrar;
+
+    private List<ProfesorRequest> profesoresAñadir;
+    private List<ProfesorRequest> profesoresBorrar;
+
+
     // Getters y setters
     public Integer getId() {
         return id;
@@ -62,5 +69,37 @@ public class CursoRequest {
 
     public void setProfesores(List<Integer> profesores) {
         this.profesores = profesores;
+    }
+
+    public List<EstudianteRequest> getEstudiantesAñadir(){
+        return estudiantesAñadir;
+    }
+
+    public void setEstudiantesAñadir(List<EstudianteRequest> estudiantesAñadir) {
+        this.estudiantesAñadir = estudiantesAñadir;
+    }
+
+    public List<EstudianteRequest> getEstudiantesBorrar(){
+        return estudiantesBorrar;
+    }
+
+    public void setEstudiantesBorrar(List<EstudianteRequest> estudiantesBorrar) {
+        this.estudiantesBorrar = estudiantesBorrar;
+    }
+
+    public List<ProfesorRequest> getProfesoresAñadir() {
+        return profesoresAñadir;
+    }
+
+    public void getProfesoresAñadir(List<ProfesorRequest> profesoresAñadir) {
+        this.profesoresAñadir = profesoresAñadir;
+    }
+
+    public List<ProfesorRequest> getProfesoresBorrar() {
+        return profesoresBorrar;
+    }
+
+    public void getProfesoresBorrar(List<ProfesorRequest> profesoresBorrar) {
+        this.profesoresBorrar = profesoresBorrar;
     }
 }

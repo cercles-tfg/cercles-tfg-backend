@@ -377,10 +377,17 @@ public class CursoController {
 
             // Borrar estudiantes del curso
             borrarEstudiantes(cursoExistente, cursoRequest.getEstudiantesBorrar());
-    
+            
             // Añadir profesores al curso
-            añadirProfesores(cursoExistente, cursoRequest.getProfesoresAñadir());
-    
+            response = añadirProfesores(cursoExistente, cursoRequest.getProfesoresAñadir());
+            if (response.getStatusCode() != HttpStatus.OK) {
+                return response;
+            }
+
+            // Borrar profesores del curso
+            borrarProfesores(cursoExistente, cursoRequest.getProfesoresBorrar());
+
+
             // Guardar los cambios finales del curso
             cursoRepository.save(cursoExistente);
     
@@ -505,9 +512,10 @@ public class CursoController {
 
     // Función para borrar profesores del curso
     private void borrarProfesores(Curso cursoExistente, List<ProfesorRequest> profesoresBorrar) {
+        List<Integer> idsProfesoresBorrados = new ArrayList<>();
+
         for (ProfesorRequest profesorRequest : profesoresBorrar) {
             Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(profesorRequest.getCorreo());
-
             if (usuarioOpt.isPresent() && usuarioOpt.get() instanceof Profesor) {
                 Profesor profesor = (Profesor) usuarioOpt.get();
 
@@ -515,10 +523,19 @@ public class CursoController {
                 Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(profesor.getId(), cursoExistente.getId());
                 if (profesorCursoOpt.isPresent()) {
                     profesorCursoRepository.delete(profesorCursoOpt.get());
+                    
+                    // Agregar el ID del profesor a la lista de IDs a borrar del curso
+                    idsProfesoresBorrados.add(profesor.getId());
                 }
+            } else {
+                System.out.println("El profesor con correo " + profesorRequest.getCorreo() + " no fue encontrado o no es un profesor.");
             }
         }
+
+        // Actualizar la lista de profesores del curso eliminando todos los profesores borrados
+        cursoExistente.getProfesores().removeIf(profesor -> idsProfesoresBorrados.contains(profesor.getId()));
     }
+
 
 
 

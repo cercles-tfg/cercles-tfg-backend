@@ -73,6 +73,7 @@ public class UsuarioController {
                 Map<String, Object> profesorData = new HashMap<>();
                 profesorData.put("id", profesor.getId());
                 profesorData.put("nombre", profesor.getNombre());
+                profesorData.put("correo", profesor.getCorreo());
                 return profesorData;
             }).collect(Collectors.toList());
 

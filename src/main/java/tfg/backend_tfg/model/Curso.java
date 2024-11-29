@@ -29,14 +29,9 @@ public class Curso {
     @Column(nullable = false)
     private boolean activo;
 
-    // Relación muchos a muchos con profesores
-    @ManyToMany
-    @JoinTable(
-            name = "profesor_curso",
-            joinColumns = @JoinColumn(name = "curso_id"),
-            inverseJoinColumns = @JoinColumn(name = "profesor_id")
-    )
-    private List<Profesor> profesores;
+    // Relación con profesores a través de ProfesorCurso
+    @OneToMany(mappedBy = "curso", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfesorCurso> profesores;
 
     // Relación muchos a muchos con estudiantes a través de EstudianteCurso
     @OneToMany(mappedBy = "curso", cascade = CascadeType.ALL, orphanRemoval = true)

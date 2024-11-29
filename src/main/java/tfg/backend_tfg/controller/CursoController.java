@@ -35,12 +35,14 @@ import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.EstudianteRequest;
 import tfg.backend_tfg.model.Profesor;
+import tfg.backend_tfg.model.ProfesorCurso;
 import tfg.backend_tfg.model.ProfesorRequest;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.UsuarioService;
 
@@ -59,6 +61,9 @@ public class CursoController {
 
     @Autowired
     private EstudianteCursoRepository estudianteCursoRepository;
+
+    @Autowired
+    private ProfesorCursoRepository profesorCursoRepository;
 
     @PostMapping("/uploadEstudiantes")
     public ResponseEntity<?> uploadEstudiantes(@RequestParam("file") MultipartFile file) {
@@ -118,7 +123,7 @@ public class CursoController {
     }
 
 
-    @PreAuthorize("hasAuthority('profesor')")
+    @PreAuthorize("hasAuthority('PROFESOR')")
     @PostMapping("/crear")
     public ResponseEntity<?> crearCurso(@RequestBody CursoRequest cursoRequest) {
         try {
@@ -130,13 +135,14 @@ public class CursoController {
 
             // Verificar si ya existe un curso con el mismo nombre, año y cuatrimestre activo
             Optional<Curso> cursoExistente = cursoRepository.findByNombreAsignaturaAndAñoInicioAndCuatrimestreAndActivo(
-                cursoRequest.getNombreAsignatura(), cursoRequest.getAñoInicio(), cursoRequest.getCuatrimestre(), true);
+                    cursoRequest.getNombreAsignatura(), cursoRequest.getAñoInicio(), cursoRequest.getCuatrimestre(), true);
             
             if (cursoExistente.isPresent()) {
                 // Si ya existe un curso similar activo, devolver una respuesta especial
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body("Curso activo ya existente. ¿Desea desactivarlo?");
             }
+
             // Crear un nuevo curso
             Curso curso = Curso.builder()
                     .nombreAsignatura(cursoRequest.getNombreAsignatura())
@@ -148,40 +154,16 @@ public class CursoController {
             // Guardar el curso en la base de datos
             curso = cursoRepository.save(curso);
 
-            // Añadir profesores al curso
-            List<Profesor> profesores = new ArrayList<>();
-            for (Integer profesorId : cursoRequest.getProfesores()) {
-                Profesor profesor = (Profesor) usuarioRepository.findById(profesorId)
-                        .orElseThrow(() -> new IllegalArgumentException("Profesor no encontrado"));
-                profesores.add(profesor);
+            // Añadir profesores al curso usando la función ya existente
+            ResponseEntity<?> responseProfesores = añadirProfesores(curso, cursoRequest.getProfesores());
+            if (!responseProfesores.getStatusCode().equals(HttpStatus.OK)) {
+                return responseProfesores; // En caso de error, devolver la respuesta correspondiente
             }
-            curso.setProfesores(profesores);
-            cursoRepository.save(curso);
 
-            // Crear estudiantes y asociarlos al curso
-            for (EstudianteRequest estudianteData : cursoRequest.getEstudiantes()) {
-                Usuario usuarioExistente = usuarioRepository.findByCorreo(estudianteData.getCorreo()).orElse(null);
-
-                if (usuarioExistente == null) {
-                    // Llamar al servicio para crear el usuario
-                    UsuarioRequest usuarioRequest = new UsuarioRequest();
-                    usuarioRequest.setCorreo(estudianteData.getCorreo());
-                    usuarioRequest.setNombre(estudianteData.getNombre());
-                    usuarioRequest.setRol(Rol.Estudiante);
-
-                    ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
-
-                    if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body("Error al crear el estudiante: " + estudianteData.getCorreo());
-                    }
-
-                    usuarioExistente = usuarioRepository.findByCorreo(estudianteData.getCorreo()).orElse(null);
-                }
-
-                // Asociar al estudiante con el curso
-                EstudianteCurso estudianteCurso = new EstudianteCurso((Estudiante) usuarioExistente, curso);
-                estudianteCursoRepository.save(estudianteCurso);
+            // Añadir estudiantes al curso usando la función ya existente
+            ResponseEntity<?> responseEstudiantes = añadirEstudiantes(curso, cursoRequest.getEstudiantes());
+            if (!responseEstudiantes.getStatusCode().equals(HttpStatus.OK)) {
+                return responseEstudiantes; // En caso de error, devolver la respuesta correspondiente
             }
 
             return ResponseEntity.status(HttpStatus.CREATED).body("Curso creado exitosamente");
@@ -191,6 +173,7 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al crear el curso: " + e.getMessage());
         }
     }
+
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @PostMapping("/cambiarEstado")
@@ -262,8 +245,6 @@ public class CursoController {
     }
 
 
-
-
     @GetMapping
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<?> obtenerCursosProfesor() {
@@ -277,12 +258,13 @@ public class CursoController {
             Profesor profesor = (Profesor) usuarioRepository.findByCorreo(email)
                     .orElseThrow(() -> new UsernameNotFoundException("Profesor no encontrado"));
 
-            // Obtener los cursos asignados al profesor autenticado
-            List<Curso> cursosAsignados = cursoRepository.findAllByProfesoresContaining(profesor);
+            // Obtener los cursos asignados al profesor autenticado desde la relación ProfesorCurso
+            List<ProfesorCurso> profesorCursos = profesorCursoRepository.findByProfesorId(profesor.getId());
 
             // Convertir los cursos en un DTO que también incluya el número de estudiantes en cada curso
-            List<CursoSummaryDTO> cursoDTOs = cursosAsignados.stream()
-                    .map(curso -> {
+            List<CursoSummaryDTO> cursoDTOs = profesorCursos.stream()
+                    .map(profesorCurso -> {
+                        Curso curso = profesorCurso.getCurso();
                         int numeroEstudiantes = estudianteCursoRepository.countByCursoId(curso.getId());
                         return new CursoSummaryDTO(
                                 curso.getId(),
@@ -303,7 +285,6 @@ public class CursoController {
     }
 
 
-
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<?> obtenerDetalleCurso(@PathVariable Integer id) {
@@ -318,14 +299,15 @@ public class CursoController {
             Profesor profesor = (Profesor) usuarioRepository.findByCorreo(email)
                     .orElseThrow(() -> new UsernameNotFoundException("Profesor no encontrado"));
 
+            // Verificar si el profesor está asignado al curso
+            Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(profesor.getId(), id);
+            if (profesorCursoOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("No tiene acceso a este curso.");
+            }
+
             // Obtener el curso con el id proporcionado
             Curso curso = cursoRepository.findById(id)
                     .orElseThrow(() -> new IllegalArgumentException("Curso no encontrado"));
-
-            // Verificar si el profesor está asignado al curso
-            if (!curso.getProfesores().contains(profesor)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("No tiene acceso a este curso.");
-            }
 
             // Obtener los estudiantes asociados al curso
             List<String> nombresEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
@@ -337,8 +319,9 @@ public class CursoController {
                     .toList();
 
             // Obtener los nombres de los profesores asociados al curso
-            List<String> nombresProfesores = curso.getProfesores().stream()
-                    .map(Profesor::getNombre)
+            List<ProfesorCurso> profesoresCurso = profesorCursoRepository.findByCursoId(curso.getId());
+            List<String> nombresProfesores = profesoresCurso.stream()
+                    .map(profesorCurso -> profesorCurso.getProfesor().getNombre())
                     .toList();
 
             // Crear el DTO con la información detallada
@@ -352,7 +335,7 @@ public class CursoController {
                     correosEstudiantes,
                     nombresProfesores
             );
-
+            System.out.println("profes " + nombresProfesores);
             return ResponseEntity.ok(cursoDetalleDTO);
 
         } catch (Exception e) {
@@ -360,6 +343,7 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los detalles del curso.");
         }
     }
+
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @PutMapping("/{id}/modificar_curso")
@@ -492,15 +476,13 @@ public class CursoController {
             Usuario usuarioExistente = usuarioRepository.findByCorreo(profesorRequest.getCorreo()).orElse(null);
             
             if (usuarioExistente == null) {
-                // Llamar al servicio para crear el usuario
+                // Crear un nuevo profesor si no existe
                 UsuarioRequest usuarioRequest = new UsuarioRequest();
                 usuarioRequest.setCorreo(profesorRequest.getCorreo());
                 usuarioRequest.setNombre(profesorRequest.getNombre());
                 usuarioRequest.setRol(Rol.Profesor);
 
                 ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
-                System.out.println("usuario creado " + usuarioRequest.getNombre());
-
                 if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body("Error al crear el profesor: " + profesorRequest.getCorreo());
@@ -509,37 +491,35 @@ public class CursoController {
                 usuarioExistente = usuarioRepository.findByCorreo(profesorRequest.getCorreo()).orElse(null);
             }
 
-            boolean what = cursoExistente.getProfesores().contains(usuarioExistente);
-            System.out.println("QUee "+ what);
-            // Asociar al profesor con el curso si no está ya asociado
-            if (!what) {
-                cursoExistente.getProfesores().add((Profesor) usuarioExistente);
-                System.out.println("usuario asociado " + usuarioExistente.getNombre());
+            // Crear la relación ProfesorCurso si no existe
+            Profesor profesor = (Profesor) usuarioExistente;
+            Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(profesor.getId(), cursoExistente.getId());
+            if (profesorCursoOpt.isEmpty()) {
+                ProfesorCurso profesorCurso = new ProfesorCurso(profesor, cursoExistente);
+                profesorCursoRepository.save(profesorCurso);
             }
-            //cursoExistente.setProfesores(profesores);
-            //cursoRepository.save(curso);
         }
         return ResponseEntity.ok().build();
     }
 
+
     // Función para borrar profesores del curso
     private void borrarProfesores(Curso cursoExistente, List<ProfesorRequest> profesoresBorrar) {
         for (ProfesorRequest profesorRequest : profesoresBorrar) {
-            // Buscar al profesor por correo
             Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(profesorRequest.getCorreo());
 
             if (usuarioOpt.isPresent() && usuarioOpt.get() instanceof Profesor) {
                 Profesor profesor = (Profesor) usuarioOpt.get();
 
-                // Verificar si el profesor está asociado al curso actual
-                if (cursoExistente.getProfesores().contains(profesor)) {
-                    // Eliminar la relación entre el profesor y el curso
-                    cursoExistente.getProfesores().remove(profesor);
-                    System.out.println("Relación eliminada con el profesor: " + profesor.getNombre());
+                // Buscar la relación ProfesorCurso y eliminarla si existe
+                Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(profesor.getId(), cursoExistente.getId());
+                if (profesorCursoOpt.isPresent()) {
+                    profesorCursoRepository.delete(profesorCursoOpt.get());
                 }
             }
         }
     }
+
 
 
 

@@ -9,7 +9,7 @@ public class CursoRequest {
     private int cuatrimestre;
     private boolean activo;
     private List<EstudianteRequest> estudiantes;
-    private List<Integer> profesores;
+    private List<ProfesorRequest> profesores;
 
     private List<EstudianteRequest> estudiantesAñadir;
     private List<EstudianteRequest> estudiantesBorrar;
@@ -63,11 +63,11 @@ public class CursoRequest {
         this.estudiantes = estudiantes;
     }
 
-    public List<Integer> getProfesores() {
+    public List<ProfesorRequest> getProfesores() {
         return profesores;
     }
 
-    public void setProfesores(List<Integer> profesores) {
+    public void setProfesores(List<ProfesorRequest> profesores) {
         this.profesores = profesores;
     }
 

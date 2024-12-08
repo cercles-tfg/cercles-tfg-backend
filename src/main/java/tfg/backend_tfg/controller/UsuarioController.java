@@ -1,14 +1,19 @@
 package tfg.backend_tfg.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.util.Pair;
 
-
+import tfg.backend_tfg.model.Estudiante;
+import tfg.backend_tfg.model.Profesor;
+import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
+import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.GithubService;
 import tfg.backend_tfg.services.UsuarioService;
@@ -17,6 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
 
 @RestController
 @RequestMapping("/api/usuarios")
@@ -37,6 +44,47 @@ public class UsuarioController {
     public List<Usuario> getAllUsuarios() {
         return usuarioService.getAllUsuarios();
     }
+
+    @PreAuthorize("hasAuthority('profesor')")
+    @PostMapping("/crear")
+    public ResponseEntity<?> crearUsuario(@RequestBody UsuarioRequest usuarioRequest) {
+        // Verificar autenticación del usuario
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+        }
+        
+        // Llamar al servicio para crear el usuario
+        return usuarioService.crearUsuario(usuarioRequest);
+    }
+
+    @GetMapping("/profesores")
+    public ResponseEntity<?> getAllProfesores() {
+        try {
+            // Verificar autenticación del usuario
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+            }
+
+            // Obtener el listado de profesores
+            List<Usuario> profesores = usuarioRepository.findAllByRol(Rol.Profesor);
+            List<Map<String, Object>> response = profesores.stream().map(profesor -> {
+                Map<String, Object> profesorData = new HashMap<>();
+                profesorData.put("id", profesor.getId());
+                profesorData.put("nombre", profesor.getNombre());
+                profesorData.put("correo", profesor.getCorreo());
+                return profesorData;
+            }).collect(Collectors.toList());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los profesores: " + e.getMessage());
+        }
+    }
+
+    
 
     @GetMapping("/{id}")
     public Optional<Usuario> getUsuarioById(@PathVariable int id) {
@@ -85,7 +133,7 @@ public class UsuarioController {
         }
     }
 
-    @PostMapping("/github/callback")
+    @PostMapping("/github/callback") //MOVER A GITHUBCONTROLLER
     public ResponseEntity<?> handleGitHubCallback(@RequestBody Map<String, String> requestBody) {
         try {
             // Obtener la información de autenticación desde el SecurityContextHolder

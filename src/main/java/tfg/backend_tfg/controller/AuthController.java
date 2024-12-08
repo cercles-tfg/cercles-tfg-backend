@@ -20,11 +20,12 @@ public class AuthController {
     @Autowired
     private final AuthenticationService authService;
 
+    /* 
     // Endpoint para registrar un nuevo usuario (estudiante o profesor)
     @PostMapping("/registro")
     public ResponseEntity<AuthenticationResponse> registro(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.registro(request));
-    }
+    }*/
 
     // Endpoint para iniciar sesión con Google
     @PostMapping("/login")

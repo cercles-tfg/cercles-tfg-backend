@@ -25,4 +25,6 @@ public interface EstudianteCursoRepository extends JpaRepository<EstudianteCurso
 
     // Buscar relación curso estudiante
     Optional<EstudianteCurso> findByEstudianteAndCurso(Estudiante estudiante, Curso cursoExistente);
+
+    boolean existsById(EstudianteCursoId id);
 }

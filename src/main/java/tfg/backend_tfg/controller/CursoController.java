@@ -353,6 +353,8 @@ public class CursoController {
             List<EquipoDTO> equiposConMiembros = equipos.stream()
                     .map(equipo -> new EquipoDTO(
                             equipo.getNombre(),
+                            equipo.getId(),
+                            equipo.getEvaluador().getId(),
                             estudianteEquipoRepository.findByEquipoId(equipo.getId()).stream()
                                     .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getNombre())
                                     .toList()

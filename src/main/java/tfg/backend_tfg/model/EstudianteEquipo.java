@@ -17,10 +17,12 @@ public class EstudianteEquipo {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("idEquipo")
+    @JoinColumn(name = "id_equipo")
     private Equipo equipo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("idEstudiante")
+    @JoinColumn(name = "id_estudiante")
     private Estudiante estudiante;
 
     // Constructor adicional que facilita la creación de EstudianteCurso

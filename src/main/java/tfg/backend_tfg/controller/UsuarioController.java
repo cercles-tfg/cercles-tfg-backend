@@ -9,12 +9,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.util.Pair;
 
+import tfg.backend_tfg.dto.EquipoSummaryDTO;
 import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.GithubService;
 import tfg.backend_tfg.services.UsuarioService;
 
@@ -33,6 +35,9 @@ public class UsuarioController {
     private final GithubService githubService;
     @Autowired
     private final UsuarioRepository usuarioRepository;
+
+     @Autowired
+    private EquipoService equipoService;
 
     public UsuarioController(UsuarioService usuarioService, UsuarioRepository usuarioRepository, GithubService githubService) {
         this.usuarioService = usuarioService;
@@ -100,7 +105,6 @@ public class UsuarioController {
     @GetMapping("/datos")
     public ResponseEntity<?> getDatosUsuario() {
         try {
-            System.out.println("AL MENOS ENTRA");
             // Obtener la información de autenticación desde el SecurityContextHolder
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -123,8 +127,6 @@ public class UsuarioController {
             response.put("correo", usuario.getCorreo());
             response.put("gitUsername", usuario.getGitUsername());
             response.put("taigaUsername", usuario.getTaigaUsername());
-
-            System.out.println("Datooos " + response);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -177,6 +179,36 @@ public class UsuarioController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
+        }
+    }
+
+    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
+    @GetMapping("/{usuario_id}/equipos")
+    public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposDeUsuario(@PathVariable int usuario_id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        int idAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."))
+                .getId();
+
+        // Verificar si el usuario autenticado tiene acceso a los datos solicitados
+        if (idAutenticado != usuario_id) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        try {
+            // Llamar al servicio para obtener los equipos como DTOs
+            List<EquipoSummaryDTO> equipos = equipoService.obtenerEquiposPorUsuario(usuario_id);
+            return ResponseEntity.ok(equipos);
+        } catch (IllegalArgumentException e) {
+            // Manejar errores específicos
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            // Manejar errores genéricos
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 

@@ -2,6 +2,8 @@ package tfg.backend_tfg.services;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -9,6 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import tfg.backend_tfg.dto.EquipoDetalleDTO;
+import tfg.backend_tfg.dto.EquipoSummaryDTO;
+import tfg.backend_tfg.dto.EstudianteDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
@@ -39,6 +44,9 @@ public class EquipoService {
     private CursoRepository cursoRepository;
 
     @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
     private ProfesorCursoRepository profesorCursoRepository;
 
     @Autowired
@@ -61,57 +69,130 @@ public class EquipoService {
             throw new IllegalArgumentException("El estudiante no pertenece al curso especificado.");
         }
     }
+
+    public List<EquipoSummaryDTO> obtenerEquiposPorCurso(int cursoId) {
+    if (!cursoRepository.existsById(cursoId)) {
+        throw new IllegalArgumentException("El curso especificado no existe.");
+    }
+
+    return equipoRepository.findByCursoId(cursoId)
+            .stream()
+            .map(equipo -> new EquipoSummaryDTO(equipo.getId(), equipo.getNombre(), equipo.getCurso().getId(), equipo.getEvaluador().getId()))
+            .collect(Collectors.toList());
+    }
+
+    public List<EquipoSummaryDTO> obtenerEquiposPorUsuario(int usuarioId) {
+        // Validar que el usuario existe
+        if (!usuarioRepository.existsById(usuarioId)) {
+            throw new IllegalArgumentException("El usuario especificado no existe.");
+        }
+    
+        // Obtener los equipos donde el usuario es estudiante
+        List<Equipo> equiposComoEstudiante = estudianteEquipoRepository.findEquiposByEstudianteId(usuarioId);
+    
+        // Obtener los equipos donde el usuario es evaluador
+        List<Equipo> equiposComoEvaluador = equipoRepository.findByEvaluadorId(usuarioId);
+    
+        // Combinar ambas listas y eliminar duplicados (si existieran)
+        List<Equipo> equiposUnicos = Stream.concat(equiposComoEstudiante.stream(), equiposComoEvaluador.stream())
+                .distinct()
+                .collect(Collectors.toList());
+    
+        // Mapear a DTO
+        return equiposUnicos.stream()
+                .map(equipo -> new EquipoSummaryDTO(equipo.getId(), equipo.getNombre(), equipo.getCurso().getId(), equipo.getEvaluador().getId()))
+                .collect(Collectors.toList());
+    }
+    
+
+    public EquipoDetalleDTO obtenerEquipoDetallePorId(int id) {
+        Equipo equipo = equipoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("El equipo especificado no existe."));
+
+        // Obtener detalles del curso
+        Curso curso = equipo.getCurso();
+
+        // Obtener detalles del evaluador
+        int evaluadorId = equipo.getEvaluador().getId();
+        String evaluadorNombre = equipo.getEvaluador().getNombre();
+        String evaluadorCorreo = equipo.getEvaluador().getCorreo();
+
+        // Obtener estudiantes del equipo usando el repositorio
+        List<EstudianteDTO> estudiantes = estudianteEquipoRepository.findByEquipoId(id)
+        .stream()
+        .map(estudianteEquipo -> {
+            Estudiante estudiante = estudianteEquipo.getEstudiante();
+            return new EstudianteDTO(
+                    estudiante.getId(),
+                    estudiante.getNombre(),
+                    estudiante.getCorreo()
+            );
+        })
+        .collect(Collectors.toList());
+
+
+        // Crear y devolver el DTO
+        return new EquipoDetalleDTO(
+                equipo.getId(),
+                equipo.getNombre(),
+                curso.getId(),
+                curso.getNombreAsignatura(),
+                curso.getAñoInicio(),
+                curso.getCuatrimestre(),
+                curso.isActivo(),
+                evaluadorId,
+                evaluadorNombre,
+                evaluadorCorreo,
+                estudiantes
+        );
+    }
+
+    
     
 
     public Equipo crearEquipo(String nombre, int cursoId, int evaluadorId, List<Integer> estudiantesIds) {
-        try {
-            // Validar que el nombre del equipo sea único en el curso
-        if (equipoRepository.existsByNombreAndCursoId(nombre, cursoId)) {
-            throw new IllegalArgumentException("Ya existe un equipo con este nombre en el curso.");
-        }
-
         // Validar que el curso existe
         Curso curso = cursoRepository.findById(cursoId)
                 .orElseThrow(() -> new IllegalArgumentException("El curso especificado no existe."));
-
+    
+        // Validar que el nombre del equipo sea único en el curso
+        if (equipoRepository.existsByNombreAndCursoId(nombre, cursoId)) {
+            throw new IllegalArgumentException("Ya existe un equipo con este nombre en el curso.");
+        }
+    
         // Validar que el profesor existe y pertenece al curso
-        
-        Profesor profesor_evaluador = profesorRepository.findById(evaluadorId)
-            .orElseThrow(() -> new IllegalArgumentException("El profesor especificado no existe."));
-        Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(evaluadorId, cursoId);
-            if (profesorCursoOpt.isEmpty()) {
-                throw new IllegalArgumentException("El profesor no pertenece al curso.");
-            }
-        
-
+        Profesor profesorEvaluador = profesorRepository.findById(evaluadorId)
+                .orElseThrow(() -> new IllegalArgumentException("El profesor especificado no existe."));
+        boolean profesorEnCurso = profesorCursoRepository.existsByProfesorIdAndCursoId(evaluadorId, cursoId);
+        if (!profesorEnCurso) {
+            throw new IllegalArgumentException("El profesor no pertenece al curso.");
+        }
+    
         // Crear el equipo
         Equipo equipo = new Equipo();
         equipo.setNombre(nombre);
         equipo.setCurso(curso);
-        equipo.setEvaluador(profesor_evaluador);
-        equipo.setValidado(false); // Inicialmente no validado
+        equipo.setEvaluador(profesorEvaluador);
+        equipo.setValidado(false);
         equipo = equipoRepository.save(equipo);
-
-        // Asociar los estudiantes al equipo
-        for (int estudianteId : estudiantesIds) {
-            Estudiante estudiante = estudianteRepository.findById(estudianteId)
-                    .orElseThrow(() -> new IllegalArgumentException("El estudiante especificado no existe."));
-            if (!curso.getEstudiantes().contains(estudiante)) {
-                throw new IllegalArgumentException("El estudiante no pertenece al curso.");
+    
+        // Validar y asociar los estudiantes al equipo
+        List<Estudiante> estudiantes = estudianteRepository.findAllById(estudiantesIds);
+        if (estudiantes.size() != estudiantesIds.size()) {
+            throw new IllegalArgumentException("Uno o más estudiantes especificados no existen.");
+        }
+    
+        for (Estudiante estudiante : estudiantes) {
+            boolean estudianteEnCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(estudiante.getId(), cursoId);
+            if (!estudianteEnCurso) {
+                throw new IllegalArgumentException("El estudiante " + estudiante.getId() + " no pertenece al curso.");
             }
-
-            EstudianteEquipo estudianteEquipo = new EstudianteEquipo();
-            estudianteEquipo.setId(new EstudianteEquipoId(equipo.getId(), estudiante.getId()));
-            estudianteEquipo.setEquipo(equipo);
-            estudianteEquipo.setEstudiante(estudiante);
+    
+            EstudianteEquipo estudianteEquipo = new EstudianteEquipo(estudiante, equipo);
             estudianteEquipoRepository.save(estudianteEquipo);
         }
-
+    
         return equipo;
-        } catch (DataIntegrityViolationException ex) {
-            // Gestionar errores de los triggers de la base de datos
-            throw new IllegalArgumentException("Error de base de datos: " + ex.getRootCause().getMessage());
-        }
-        
     }
+    
 }

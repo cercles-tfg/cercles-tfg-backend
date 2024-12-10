@@ -29,6 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import tfg.backend_tfg.dto.CursoDetalleDTO;
 import tfg.backend_tfg.dto.CursoSummaryDTO;
+import tfg.backend_tfg.dto.EquipoDetalleDTO;
+import tfg.backend_tfg.dto.EquipoSummaryDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
 import tfg.backend_tfg.model.Estudiante;
@@ -44,6 +46,7 @@ import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.UsuarioService;
 
 @RestController
@@ -64,6 +67,9 @@ public class CursoController {
 
     @Autowired
     private ProfesorCursoRepository profesorCursoRepository;
+
+    @Autowired
+    private EquipoService equipoService;
 
     @PostMapping("/uploadEstudiantes")
     public ResponseEntity<?> uploadEstudiantes(@RequestParam("file") MultipartFile file) {
@@ -538,7 +544,25 @@ public class CursoController {
 
 
 
-
+    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
+    @GetMapping("/{cursoId}/equipos")
+    public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposPorCurso(@PathVariable int cursoId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        try {
+            // Llamar al servicio para obtener los equipos como DTOs
+            List<EquipoSummaryDTO> equipos = equipoService.obtenerEquiposPorCurso(cursoId);
+            return ResponseEntity.ok(equipos);
+        } catch (IllegalArgumentException e) {
+            // Manejar errores específicos
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            // Manejar errores genéricos
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
 
 
 }

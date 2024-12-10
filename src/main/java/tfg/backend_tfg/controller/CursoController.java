@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,10 +30,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import tfg.backend_tfg.dto.CursoDetalleDTO;
 import tfg.backend_tfg.dto.CursoSummaryDTO;
+import tfg.backend_tfg.dto.EquipoDTO;
 import tfg.backend_tfg.dto.EquipoDetalleDTO;
 import tfg.backend_tfg.dto.EquipoSummaryDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
+import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.EstudianteRequest;
@@ -43,7 +46,9 @@ import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.CursoRepository;
+import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.EquipoService;
@@ -67,6 +72,12 @@ public class CursoController {
 
     @Autowired
     private ProfesorCursoRepository profesorCursoRepository;
+
+    @Autowired
+    private EstudianteEquipoRepository estudianteEquipoRepository;
+
+    @Autowired
+    private EquipoRepository equipoRepository;
 
     @Autowired
     private EquipoService equipoService;
@@ -316,12 +327,36 @@ public class CursoController {
                     .orElseThrow(() -> new IllegalArgumentException("Curso no encontrado"));
 
             // Obtener los estudiantes asociados al curso
-            List<String> nombresEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
-                    .map(estudianteCurso -> estudianteCurso.getEstudiante().getNombre())
+            List<EstudianteCurso> estudiantesCurso = estudianteCursoRepository.findByCursoId(curso.getId());
+
+            // Obtener IDs de estudiantes que pertenecen a algún equipo
+            List<Integer> estudiantesConEquipoIds = estudianteEquipoRepository.findByCursoId(curso.getId()).stream()
+                    .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getId())
                     .toList();
 
-            List<String> correosEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
-                    .map(estudianteCurso -> estudianteCurso.getEstudiante().getCorreo())
+            // Filtrar los estudiantes que no pertenecen a ningún equipo
+            List<Estudiante> estudiantesSinGrupo = estudiantesCurso.stream()
+                    .map(EstudianteCurso::getEstudiante)
+                    .filter(estudiante -> !estudiantesConEquipoIds.contains(estudiante.getId()))
+                    .toList();
+
+            // Crear listas de nombres y correos de estudiantes sin grupo
+            List<String> nombresEstudiantesSinGrupo = estudiantesSinGrupo.stream()
+                    .map(Estudiante::getNombre)
+                    .toList();
+            List<String> correosEstudiantesSinGrupo = estudiantesSinGrupo.stream()
+                    .map(Estudiante::getCorreo)
+                    .toList();
+
+            // Obtener equipos y sus miembros
+            List<Equipo> equipos = equipoRepository.findByCursoId(curso.getId());
+            List<EquipoDTO> equiposConMiembros = equipos.stream()
+                    .map(equipo -> new EquipoDTO(
+                            equipo.getNombre(),
+                            estudianteEquipoRepository.findByEquipoId(equipo.getId()).stream()
+                                    .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getNombre())
+                                    .toList()
+                    ))
                     .toList();
 
             // Obtener los nombres de los profesores asociados al curso
@@ -337,11 +372,12 @@ public class CursoController {
                     curso.getAñoInicio(),
                     curso.getCuatrimestre(),
                     curso.isActivo(),
-                    nombresEstudiantes,
-                    correosEstudiantes,
-                    nombresProfesores
+                    nombresEstudiantesSinGrupo,
+                    correosEstudiantesSinGrupo,
+                    nombresProfesores,
+                    equiposConMiembros
             );
-            System.out.println("profes " + nombresProfesores);
+
             return ResponseEntity.ok(cursoDetalleDTO);
 
         } catch (Exception e) {
@@ -349,6 +385,7 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los detalles del curso.");
         }
     }
+
 
 
     @PreAuthorize("hasAuthority('PROFESOR')")

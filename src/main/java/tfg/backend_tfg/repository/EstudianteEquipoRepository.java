@@ -1,8 +1,10 @@
 package tfg.backend_tfg.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,5 +25,16 @@ public interface EstudianteEquipoRepository extends JpaRepository<EstudianteEqui
 
     @Query("SELECT ee FROM EstudianteEquipo ee WHERE ee.estudiante.id = :estudianteId AND ee.equipo.curso.id = :cursoId")
     List<EstudianteEquipo> findByEstudianteIdAndCursoId(@Param("estudianteId") int estudianteId, @Param("cursoId") int cursoId);
+
+    @Modifying
+    @Query("DELETE FROM EstudianteEquipo ee WHERE ee.equipo.id = :equipoId")
+    void deleteByEquipoId(@Param("equipoId") int equipoId);
+
+    @Query("SELECT ee FROM EstudianteEquipo ee WHERE ee.estudiante.id = :estudianteId AND ee.equipo.id = :equipoId")
+    Optional<EstudianteEquipo> findByEstudianteIdAndEquipoId(@Param("estudianteId") int estudianteId, @Param("equipoId") int equipoId);
+
+    @Query("SELECT COUNT(ee) FROM EstudianteEquipo ee WHERE ee.equipo.id = :equipoId")
+    long countByEquipoId(@Param("equipoId") int equipoId);
+
 
 }

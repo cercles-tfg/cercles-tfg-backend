@@ -195,4 +195,31 @@ public class EquipoService {
         return equipo;
     }
     
+    public void borrarEquipo(int equipoId) {
+        if (!equipoRepository.existsById(equipoId)) {
+            throw new IllegalArgumentException("El equipo con el ID proporcionado no existe.");
+        }
+
+        // Borrar el equipo
+        equipoRepository.deleteById(equipoId);
+    }
+
+    public void salirseDelEquipo(int equipoId, int estudianteId) {
+        // Verificar si el equipo existe
+        Equipo equipo = equipoRepository.findById(equipoId)
+                .orElseThrow(() -> new IllegalArgumentException("El equipo con el ID proporcionado no existe."));
+
+        // Verificar si el estudiante está en el equipo
+        EstudianteEquipo estudianteEquipo = estudianteEquipoRepository.findByEstudianteIdAndEquipoId(estudianteId, equipoId)
+                .orElseThrow(() -> new IllegalArgumentException("El estudiante no pertenece a este equipo."));
+
+        // Borrar la relación entre el estudiante y el equipo
+        estudianteEquipoRepository.delete(estudianteEquipo);
+
+        // Verificar si el equipo se quedó sin miembros
+        long miembrosRestantes = estudianteEquipoRepository.countByEquipoId(equipoId);
+        if (miembrosRestantes == 0) {
+            equipoRepository.delete(equipo);
+        }
+    }
 }

@@ -6,18 +6,27 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import tfg.backend_tfg.dto.EstudianteDTO;
+import tfg.backend_tfg.model.Curso;
+import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.Profesor;
+import tfg.backend_tfg.repository.CursoRepository;
+import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 
 @Service
 public class CursoService {
+
+    @Autowired
+    private CursoRepository cursoRepository;
+
+    @Autowired
+    private EquipoRepository equipoRepository;
 
     @Autowired
     private EstudianteCursoRepository estudianteCursoRepository;
@@ -73,5 +82,14 @@ public class CursoService {
                     );
                 })
                 .toList();
+    }
+
+    public void borrarCurso(int cursoId) {
+        // Verificar si el curso existe
+        Curso curso = cursoRepository.findById(cursoId)
+                .orElseThrow(() -> new IllegalArgumentException("Curso no encontrado."));
+
+        // Eliminar el curso
+        cursoRepository.delete(curso);
     }
 }

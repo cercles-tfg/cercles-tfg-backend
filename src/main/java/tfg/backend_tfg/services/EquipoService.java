@@ -222,4 +222,48 @@ public class EquipoService {
             equipoRepository.delete(equipo);
         }
     }
+
+    public void añadirMiembros(int equipoId, List<Integer> estudiantesIds) {
+        // Validar que el equipo existe
+        Equipo equipo = equipoRepository.findById(equipoId)
+            .orElseThrow(() -> new IllegalArgumentException("El equipo no existe."));
+    
+        for (int estudianteId : estudiantesIds) {
+            // Validar que el estudiante existe
+            Estudiante estudiante = estudianteRepository.findById(estudianteId)
+                .orElseThrow(() -> new IllegalArgumentException("El estudiante con ID " + estudianteId + " no existe."));
+    
+            // Verificar que el estudiante no esté ya en el equipo
+            boolean yaEsMiembro = estudianteEquipoRepository.existsByEstudianteIdAndEquipoId(estudianteId, equipoId);
+    
+            if (yaEsMiembro) {
+                throw new IllegalArgumentException("El estudiante con ID " + estudianteId + " ya es miembro del equipo.");
+            }
+    
+            // Crear la relación entre el estudiante y el equipo
+            EstudianteEquipo nuevoMiembro = new EstudianteEquipo(estudiante, equipo);
+            estudianteEquipoRepository.save(nuevoMiembro);
+        }
+    }
+
+    public void borrarMiembros(int equipoId, List<Integer> estudiantesIds) {
+        // Validar que el equipo existe
+        Equipo equipo = equipoRepository.findById(equipoId)
+            .orElseThrow(() -> new IllegalArgumentException("El equipo no existe."));
+    
+        for (int estudianteId : estudiantesIds) {
+            // Validar que el estudiante existe
+            Estudiante estudiante = estudianteRepository.findById(estudianteId)
+                .orElseThrow(() -> new IllegalArgumentException("El estudiante con ID " + estudianteId + " no existe."));
+    
+            // Verificar que el estudiante sea miembro del equipo
+            EstudianteEquipo relacion = estudianteEquipoRepository.findByEstudianteIdAndEquipoId(estudianteId, equipoId)
+                .orElseThrow(() -> new IllegalArgumentException("El estudiante con ID " + estudianteId + " no pertenece al equipo."));
+    
+            // Eliminar la relación entre el estudiante y el equipo
+            estudianteEquipoRepository.delete(relacion);
+        }
+    }
+    
+    
 }

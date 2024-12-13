@@ -129,6 +129,46 @@ public class EquipoController {
         }
     }
 
+    @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
+    @PostMapping("/{id}/añadir_miembros")
+    public ResponseEntity<String> añadirMiembros(@PathVariable int id, @RequestBody Map<String, List<Integer>> body) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+        }
+
+        try {
+            List<Integer> estudiantesIds = body.get("estudiantesIds");
+            equipoService.añadirMiembros(id, estudiantesIds);
+            return ResponseEntity.ok("Miembros añadidos correctamente al equipo.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al añadir los miembros al equipo.");
+        }
+    }
+
+    @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
+    @DeleteMapping("/{id}/borrar_miembros")
+    public ResponseEntity<String> borrarMiembros(@PathVariable int id, @RequestBody Map<String, List<Integer>> body) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+        }
+
+        try {
+            List<Integer> estudiantesIds = body.get("estudiantesIds");
+            equipoService.borrarMiembros(id, estudiantesIds);
+            return ResponseEntity.ok("Miembros eliminados correctamente del equipo.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al eliminar los miembros del equipo.");
+        }
+    }
+
+
+
 
 
 }

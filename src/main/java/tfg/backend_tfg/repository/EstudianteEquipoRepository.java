@@ -36,5 +36,6 @@ public interface EstudianteEquipoRepository extends JpaRepository<EstudianteEqui
     @Query("SELECT COUNT(ee) FROM EstudianteEquipo ee WHERE ee.equipo.id = :equipoId")
     long countByEquipoId(@Param("equipoId") int equipoId);
 
+    boolean existsByEstudianteIdAndEquipoId(int estudianteId, int equipoId);
 
 }

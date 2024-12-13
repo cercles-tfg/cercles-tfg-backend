@@ -9,12 +9,17 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.util.Pair;
 
+import tfg.backend_tfg.dto.CursoSummaryDTO;
 import tfg.backend_tfg.dto.EquipoSummaryDTO;
+import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.Estudiante;
+import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
+import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.GithubService;
@@ -38,6 +43,12 @@ public class UsuarioController {
 
      @Autowired
     private EquipoService equipoService;
+
+    @Autowired
+    private EstudianteEquipoRepository estudianteEquipoRepository;
+
+    @Autowired
+    private EstudianteCursoRepository estudianteCursoRepository;
 
     public UsuarioController(UsuarioService usuarioService, UsuarioRepository usuarioRepository, GithubService githubService) {
         this.usuarioService = usuarioService;
@@ -211,6 +222,47 @@ public class UsuarioController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
+    @PreAuthorize("hasAuthority('ESTUDIANTE')")
+    @GetMapping("/{id}/cursos")
+    public ResponseEntity<List<CursoSummaryDTO>> obtenerCursosDisponibles(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        int idAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."))
+                .getId();
+
+        // Verificar si el usuario autenticado tiene acceso a los datos solicitados
+        if (idAutenticado != id) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        try {
+            // Obtener todos los cursos del estudiante
+            List<EstudianteCurso> cursosEstudiante = estudianteCursoRepository.findByEstudianteId(id);
+
+            // Filtrar cursos donde el estudiante ya tenga equipo
+            List<CursoSummaryDTO> cursosSinEquipo = cursosEstudiante.stream()
+            .filter(ec -> estudianteEquipoRepository.findByEstudianteIdAndCursoId(id, ec.getCurso().getId()).isEmpty())
+            .map(ec -> new CursoSummaryDTO(
+                    ec.getCurso().getId(),
+                    ec.getCurso().getNombreAsignatura(),
+                    ec.getCurso().getAñoInicio(),
+                    ec.getCurso().getCuatrimestre(),
+                    ec.getCurso().isActivo(),
+                    0
+            ))
+                    .toList();
+
+            return ResponseEntity.ok(cursosSinEquipo);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
 
 
 

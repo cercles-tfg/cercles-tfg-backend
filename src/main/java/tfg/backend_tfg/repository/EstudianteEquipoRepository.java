@@ -20,4 +20,8 @@ public interface EstudianteEquipoRepository extends JpaRepository<EstudianteEqui
 
     @Query("SELECT ee FROM EstudianteEquipo ee WHERE ee.equipo.curso.id = :cursoId")
     List<EstudianteEquipo> findByCursoId(@Param("cursoId") int cursoId);
+
+    @Query("SELECT ee FROM EstudianteEquipo ee WHERE ee.estudiante.id = :estudianteId AND ee.equipo.curso.id = :cursoId")
+    List<EstudianteEquipo> findByEstudianteIdAndCursoId(@Param("estudianteId") int estudianteId, @Param("cursoId") int cursoId);
+
 }

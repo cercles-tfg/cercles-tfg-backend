@@ -33,6 +33,7 @@ import tfg.backend_tfg.dto.CursoSummaryDTO;
 import tfg.backend_tfg.dto.EquipoDTO;
 import tfg.backend_tfg.dto.EquipoDetalleDTO;
 import tfg.backend_tfg.dto.EquipoSummaryDTO;
+import tfg.backend_tfg.dto.EstudianteDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
 import tfg.backend_tfg.model.Equipo;
@@ -51,6 +52,7 @@ import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.services.CursoService;
 import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.UsuarioService;
 
@@ -81,6 +83,9 @@ public class CursoController {
 
     @Autowired
     private EquipoService equipoService;
+
+    @Autowired
+    private CursoService cursoService;
 
     @PostMapping("/uploadEstudiantes")
     public ResponseEntity<?> uploadEstudiantes(@RequestParam("file") MultipartFile file) {
@@ -583,7 +588,7 @@ public class CursoController {
 
 
 
-    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
+    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')") //PERFE
     @GetMapping("/{cursoId}/equipos")
     public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposPorCurso(@PathVariable int cursoId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -602,6 +607,64 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
+    @PreAuthorize("hasAuthority('ESTUDIANTE')") //PERFE
+    @GetMapping("/{id}/estudiantes") 
+    public ResponseEntity<Map<String, List<EstudianteDTO>>> obtenerEstudiantesPorCurso(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+
+        // Verificar que el usuario autenticado es parte del curso
+        boolean estaEnCurso = estudianteCursoRepository.findByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id)
+                .isPresent();
+        if (!estaEnCurso) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        try {
+            // Delegar la lógica al servicio
+            Map<String, List<EstudianteDTO>> estudiantesPorCurso = cursoService.obtenerEstudiantesPorCurso(id);
+            return ResponseEntity.ok(estudiantesPorCurso);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @PreAuthorize("hasAuthority('ESTUDIANTE')")
+    @GetMapping("/{id}/profesores")
+    public ResponseEntity<List<EstudianteDTO>> obtenerProfesoresDelCurso(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+
+        // Comprobar que el usuario es estudiante del curso
+        boolean esEstudianteDelCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id);
+        if (!esEstudianteDelCurso) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        try {
+            List<EstudianteDTO> profesores = cursoService.obtenerProfesoresDelCurso(id);
+            return ResponseEntity.ok(profesores);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+
 
 
 }

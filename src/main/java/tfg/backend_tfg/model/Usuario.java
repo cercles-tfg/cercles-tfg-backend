@@ -55,6 +55,7 @@ public abstract class Usuario implements UserDetails {
     private Rol rol;
 
     private String githubAccessToken;
+    private String taigaAccessToken;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -97,5 +98,13 @@ public abstract class Usuario implements UserDetails {
 
     public void setGithubAccessToken(String accessToken) {
         this.githubAccessToken = accessToken;
+    }
+
+    public String getTaigaAccessToken(){
+        return taigaAccessToken;
+    }
+
+    public void setTaigaAccessToken(String accessToken) {
+        this.taigaAccessToken = accessToken;
     }
 }

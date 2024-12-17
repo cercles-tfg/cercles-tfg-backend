@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,8 +31,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import tfg.backend_tfg.dto.CursoDetalleDTO;
 import tfg.backend_tfg.dto.CursoSummaryDTO;
+import tfg.backend_tfg.dto.EquipoDTO;
+import tfg.backend_tfg.dto.EquipoDetalleDTO;
+import tfg.backend_tfg.dto.EquipoSummaryDTO;
+import tfg.backend_tfg.dto.EstudianteDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
+import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.EstudianteRequest;
@@ -41,9 +48,13 @@ import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.CursoRepository;
+import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.services.CursoService;
+import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.UsuarioService;
 
 @RestController
@@ -64,6 +75,18 @@ public class CursoController {
 
     @Autowired
     private ProfesorCursoRepository profesorCursoRepository;
+
+    @Autowired
+    private EstudianteEquipoRepository estudianteEquipoRepository;
+
+    @Autowired
+    private EquipoRepository equipoRepository;
+
+    @Autowired
+    private EquipoService equipoService;
+
+    @Autowired
+    private CursoService cursoService;
 
     @PostMapping("/uploadEstudiantes")
     public ResponseEntity<?> uploadEstudiantes(@RequestParam("file") MultipartFile file) {
@@ -310,12 +333,38 @@ public class CursoController {
                     .orElseThrow(() -> new IllegalArgumentException("Curso no encontrado"));
 
             // Obtener los estudiantes asociados al curso
-            List<String> nombresEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
-                    .map(estudianteCurso -> estudianteCurso.getEstudiante().getNombre())
+            List<EstudianteCurso> estudiantesCurso = estudianteCursoRepository.findByCursoId(curso.getId());
+
+            // Obtener IDs de estudiantes que pertenecen a algún equipo
+            List<Integer> estudiantesConEquipoIds = estudianteEquipoRepository.findByCursoId(curso.getId()).stream()
+                    .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getId())
                     .toList();
 
-            List<String> correosEstudiantes = estudianteCursoRepository.findByCursoId(curso.getId()).stream()
-                    .map(estudianteCurso -> estudianteCurso.getEstudiante().getCorreo())
+            // Filtrar los estudiantes que no pertenecen a ningún equipo
+            List<Estudiante> estudiantesSinGrupo = estudiantesCurso.stream()
+                    .map(EstudianteCurso::getEstudiante)
+                    .filter(estudiante -> !estudiantesConEquipoIds.contains(estudiante.getId()))
+                    .toList();
+
+            // Crear listas de nombres y correos de estudiantes sin grupo
+            List<String> nombresEstudiantesSinGrupo = estudiantesSinGrupo.stream()
+                    .map(Estudiante::getNombre)
+                    .toList();
+            List<String> correosEstudiantesSinGrupo = estudiantesSinGrupo.stream()
+                    .map(Estudiante::getCorreo)
+                    .toList();
+
+            // Obtener equipos y sus miembros
+            List<Equipo> equipos = equipoRepository.findByCursoId(curso.getId());
+            List<EquipoDTO> equiposConMiembros = equipos.stream()
+                    .map(equipo -> new EquipoDTO(
+                            equipo.getNombre(),
+                            equipo.getId(),
+                            equipo.getEvaluador().getId(),
+                            estudianteEquipoRepository.findByEquipoId(equipo.getId()).stream()
+                                    .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getNombre())
+                                    .toList()
+                    ))
                     .toList();
 
             // Obtener los nombres de los profesores asociados al curso
@@ -331,11 +380,12 @@ public class CursoController {
                     curso.getAñoInicio(),
                     curso.getCuatrimestre(),
                     curso.isActivo(),
-                    nombresEstudiantes,
-                    correosEstudiantes,
-                    nombresProfesores
+                    nombresEstudiantesSinGrupo,
+                    correosEstudiantesSinGrupo,
+                    nombresProfesores,
+                    equiposConMiembros
             );
-            System.out.println("profes " + nombresProfesores);
+
             return ResponseEntity.ok(cursoDetalleDTO);
 
         } catch (Exception e) {
@@ -343,6 +393,7 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los detalles del curso.");
         }
     }
+
 
 
     @PreAuthorize("hasAuthority('PROFESOR')")
@@ -538,7 +589,98 @@ public class CursoController {
 
 
 
+    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')") //PERFE
+    @GetMapping("/{cursoId}/equipos")
+    public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposPorCurso(@PathVariable int cursoId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+        try {
+            // Llamar al servicio para obtener los equipos como DTOs
+            List<EquipoSummaryDTO> equipos = equipoService.obtenerEquiposPorCurso(cursoId);
+            return ResponseEntity.ok(equipos);
+        } catch (IllegalArgumentException e) {
+            // Manejar errores específicos
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            // Manejar errores genéricos
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
 
+    @PreAuthorize("hasAuthority('ESTUDIANTE')") //PERFE
+    @GetMapping("/{id}/estudiantes") 
+    public ResponseEntity<Map<String, List<EstudianteDTO>>> obtenerEstudiantesPorCurso(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+
+        // Verificar que el usuario autenticado es parte del curso
+        boolean estaEnCurso = estudianteCursoRepository.findByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id)
+                .isPresent();
+        if (!estaEnCurso) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        try {
+            // Delegar la lógica al servicio
+            Map<String, List<EstudianteDTO>> estudiantesPorCurso = cursoService.obtenerEstudiantesPorCurso(id);
+            return ResponseEntity.ok(estudiantesPorCurso);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @PreAuthorize("hasAuthority('ESTUDIANTE')")
+    @GetMapping("/{id}/profesores")
+    public ResponseEntity<List<EstudianteDTO>> obtenerProfesoresDelCurso(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        // Obtener el ID del usuario desde el token JWT
+        String correoAutenticado = authentication.getName();
+        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+
+        // Comprobar que el usuario es estudiante del curso
+        boolean esEstudianteDelCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id);
+        if (!esEstudianteDelCurso) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+
+        try {
+            List<EstudianteDTO> profesores = cursoService.obtenerProfesoresDelCurso(id);
+            return ResponseEntity.ok(profesores);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    @DeleteMapping("/{id}/borrar")
+    public ResponseEntity<String> borrarCurso(@PathVariable int id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
+        }
+        try {
+            cursoService.borrarCurso(id);
+            return ResponseEntity.ok("Curso borrado exitosamente.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al borrar el curso.");
+        }
+    }
 
 
 }

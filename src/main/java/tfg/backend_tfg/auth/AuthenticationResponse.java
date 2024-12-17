@@ -13,9 +13,11 @@ import tfg.backend_tfg.model.Rol;
 public class AuthenticationResponse {
     private String token;
     private Rol rol;
+    private int id;
 
-    public AuthenticationResponse(String token, Rol rol) {
+    public AuthenticationResponse(String token, Rol rol, int id) {
         this.token = token;
         this.rol = rol; 
+        this.id = id;
     }
 }

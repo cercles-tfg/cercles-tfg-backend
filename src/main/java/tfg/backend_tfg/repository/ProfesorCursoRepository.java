@@ -26,5 +26,7 @@ public interface ProfesorCursoRepository extends JpaRepository<ProfesorCurso, Pr
     // Buscar relación curso profesor por ids
     Optional<ProfesorCurso> findByProfesorIdAndCursoId(int id1, int id2);
 
+    boolean existsByProfesorIdAndCursoId(int evaluadorId, int cursoId);
+
     
 }

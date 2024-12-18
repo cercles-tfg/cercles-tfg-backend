@@ -25,19 +25,27 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.util.Pair;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import tfg.backend_tfg.dto.MetricasUsuarioDTO;
 import tfg.backend_tfg.model.Equipo;
+import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.GitHubUserDetails;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.EquipoRepository;
+import tfg.backend_tfg.repository.EstudianteRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 
 @Service
@@ -56,11 +64,15 @@ public class GithubService {
     private String privateKeyPath;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private RestTemplate restTemplate;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
     @Autowired
     private EquipoRepository equipoRepository;
+    @Autowired
+    private EstudianteRepository estudianteRepository;
 
     // 1. Leer la clave privada desde el archivo PEM y convertirla a RSAPrivateKey
     private RSAPrivateKey getPrivateKey() throws Exception {
@@ -109,8 +121,7 @@ public class GithubService {
     }
 
     // 4. obtener installation id
-    private String getInstallationId(String organizacion) throws Exception {
-        String jwt = generateJWT();
+    private String getInstallationId(String organizacion, String jwt) throws Exception {
         String url = "https://api.github.com/app/installations";
 
         try (CloseableHttpClient client = HttpClients.createDefault()) {
@@ -135,7 +146,8 @@ public class GithubService {
     // 5. validar org
     public Map<String, Boolean> validarOrganizacion(Integer profesorId, List<Integer> miembrosIds, String organizacionUrl) throws Exception {
         String organizacion = organizacionUrl.replace("https://github.com/", "").replaceAll("/$", "");
-        String installationId = getInstallationId(organizacion);
+        String jwt = generateJWT();
+        String installationId = getInstallationId(organizacion, jwt);
         String accessToken = getInstallationAccessToken(installationId);
 
         // Obtener git_username de los miembros
@@ -191,6 +203,7 @@ public class GithubService {
         equipoRepository.save(equipo);
     }
 
+    // 7. obtener el nombre de usuario de github
     public Pair<String, String> obtenerNombreUsuarioGitHub(String code) {
         String accessTokenUrl = "https://github.com/login/oauth/access_token";
         String userApiUrl = "https://api.github.com/user";
@@ -252,84 +265,165 @@ public class GithubService {
         }
         return null;
     }
-    
-    // Método para obtener detalles adicionales del usuario GitHub
-    public GitHubUserDetails obtenerDetallesAdicionalesUsuarioGitHub(String accessToken) {
-        String userApiUrl = "https://api.github.com/user";
-        String reposApiUrl = "https://api.github.com/user/repos";
 
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            ObjectMapper objectMapper = new ObjectMapper();
+    public String obtenerAccessTokenOrganizacion(String organizacion) throws Exception {
+        // 1. Generar un JWT
+        String jwt = generateJWT();
 
-            // Paso 1: Obtener detalles básicos del usuario
-            HttpGet userRequest = new HttpGet(userApiUrl);
-            userRequest.setHeader("Authorization", "Bearer " + accessToken);
-            userRequest.setHeader("Accept", "application/json");
+        // 2. Obtener la instalación asociada a la organización
+        String installationId = getInstallationId(organizacion, jwt);
 
-            try (CloseableHttpResponse userResponse = client.execute(userRequest)) {
-                String userResponseBody = EntityUtils.toString(userResponse.getEntity());
+        // 3. Solicitar el token de acceso
+        String tokenUrl = "https://api.github.com/app/installations/" + installationId + "/access_tokens";
 
-                // Parsear la respuesta para obtener información básica
-                JsonNode userJson = objectMapper.readTree(userResponseBody);
-                JsonNode loginNode = userJson.get("login");
-                JsonNode publicReposNode = userJson.get("public_repos");
-                JsonNode followersNode = userJson.get("followers");
-                JsonNode followingNode = userJson.get("following");
-                JsonNode companyNode = userJson.get("company");
-                JsonNode locationNode = userJson.get("location");
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + jwt);
+        headers.set("Accept", "application/vnd.github+json");
 
-                if (loginNode == null || loginNode.asText().isEmpty()) {
-                    System.err.println("No se encontró el nombre de usuario de GitHub en la respuesta");
-                    return null;
-                }
+        HttpEntity<String> entity = new HttpEntity<>(headers);
 
-                GitHubUserDetails userDetails = new GitHubUserDetails();
-                userDetails.setLogin(loginNode.asText());
-                userDetails.setPublicRepos(publicReposNode != null ? publicReposNode.asInt() : 0);
-                userDetails.setFollowers(followersNode != null ? followersNode.asInt() : 0);
-                userDetails.setFollowing(followingNode != null ? followingNode.asInt() : 0);
-                userDetails.setCompany(companyNode != null ? companyNode.asText() : "No especificado");
-                userDetails.setLocation(locationNode != null ? locationNode.asText() : "No especificada");
+        ResponseEntity<Map> response = restTemplate.exchange(tokenUrl, HttpMethod.POST, entity, Map.class);
 
-                // Paso 2: Obtener el número total de repositorios del usuario y detalles adicionales
-                HttpGet reposRequest = new HttpGet(reposApiUrl);
-                reposRequest.setHeader("Authorization", "Bearer " + accessToken);
-                reposRequest.setHeader("Accept", "application/json");
-
-                try (CloseableHttpResponse reposResponse = client.execute(reposRequest)) {
-                    String reposResponseBody = EntityUtils.toString(reposResponse.getEntity());
-                    JsonNode reposJson = objectMapper.readTree(reposResponseBody);
-
-                    int privateReposCount = 0;
-                    int totalCommits = 0;
-
-                    for (JsonNode repo : reposJson) {
-                        if (repo.get("private").asBoolean()) {
-                            privateReposCount++;
-                        }
-
-                        // Para cada repositorio, obtenemos el número de commits (esta es una simplificación)
-                        String commitsUrl = repo.get("commits_url").asText().replace("{/sha}", "");
-                        HttpGet commitsRequest = new HttpGet(commitsUrl);
-                        commitsRequest.setHeader("Authorization", "Bearer " + accessToken);
-                        commitsRequest.setHeader("Accept", "application/json");
-
-                        try (CloseableHttpResponse commitsResponse = client.execute(commitsRequest)) {
-                            String commitsResponseBody = EntityUtils.toString(commitsResponse.getEntity());
-                            JsonNode commitsJson = objectMapper.readTree(commitsResponseBody);
-                            totalCommits += commitsJson.size();
-                        }
-                    }
-
-                    userDetails.setPrivateRepos(privateReposCount);
-                    userDetails.setTotalCommits(totalCommits);
-                }
-
-                return userDetails;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
+        // Extraer el token del cuerpo de la respuesta
+        return (String) response.getBody().get("token");
     }
+
+    
+    // Obtener repositorios de la organización
+    public List<String> obtenerRepositorios(String organizacion, String accessToken) {
+        String url = "https://api.github.com/orgs/" + organizacion + "/repos";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/vnd.github+json");
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<JsonNode> response = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
+
+        List<String> repositorios = new ArrayList<>();
+        response.getBody().forEach(repo -> repositorios.add(repo.get("name").asText()));
+        return repositorios;
+    }
+
+    //obtener metricas de un repo
+    public List<MetricasUsuarioDTO> obtenerMetricasRepositorio(String organizacion, String repo, List<String> usuarios, String accessToken) {
+        if (isRepositorioVacio(organizacion, repo, accessToken)) {
+            System.out.println("El repositorio " + repo + " está vacío. Se omite.");
+            return Collections.emptyList();
+        }
+    
+        String commitsUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/commits";
+        String pullsUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/pulls";
+    
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/vnd.github+json");
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+    
+        Map<String, MetricasUsuarioDTO> metricsMap = new HashMap<>();
+    
+        for (String usuario : usuarios) {
+            MetricasUsuarioDTO metrics = new MetricasUsuarioDTO();
+            metrics.setUsername(usuario);
+            metricsMap.put(usuario, metrics);
+        }
+    
+        try {
+            // Obtener commits y estadísticas
+            ResponseEntity<JsonNode> commitsResponse = restTemplate.exchange(commitsUrl, HttpMethod.GET, entity, JsonNode.class);
+            for (JsonNode commit : commitsResponse.getBody()) {
+                String author = commit.path("author").path("login").asText();
+                if (metricsMap.containsKey(author)) {
+                    MetricasUsuarioDTO metrics = metricsMap.get(author);
+                    metrics.setTotalCommits(metrics.getTotalCommits() + 1);
+    
+                    // Obtener detalles del commit
+                    String commitUrl = commit.path("url").asText();
+                    ResponseEntity<JsonNode> commitDetails = restTemplate.exchange(commitUrl, HttpMethod.GET, entity, JsonNode.class);
+                    JsonNode stats = commitDetails.getBody().path("stats");
+    
+                    metrics.setLinesAdded(metrics.getLinesAdded() + stats.path("additions").asInt());
+                    metrics.setLinesRemoved(metrics.getLinesRemoved() + stats.path("deletions").asInt());
+                }
+            }
+    
+            // Obtener Pull Requests
+            ResponseEntity<JsonNode> pullsResponse = restTemplate.exchange(pullsUrl, HttpMethod.GET, entity, JsonNode.class);
+            for (JsonNode pull : pullsResponse.getBody()) {
+                String author = pull.path("user").path("login").asText();
+                if (metricsMap.containsKey(author)) {
+                    MetricasUsuarioDTO metrics = metricsMap.get(author);
+                    metrics.setPullRequestsCreated(metrics.getPullRequestsCreated() + 1);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error al obtener métricas del repositorio " + repo + ": " + e.getMessage());
+        }
+    
+        return new ArrayList<>(metricsMap.values());
+    }
+    
+
+    //comprobar si algun repo está vacio
+    public boolean isRepositorioVacio(String organizacion, String repo, String accessToken) {
+        String repoUrl = "https://api.github.com/repos/" + organizacion + "/" + repo;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/vnd.github+json");
+    
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+    
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(repoUrl, HttpMethod.GET, entity, JsonNode.class);
+            JsonNode body = response.getBody();
+            return body == null || body.path("default_branch").isMissingNode();
+        } catch (Exception e) {
+            System.err.println("Error al verificar si el repositorio está vacío: " + e.getMessage());
+            return true; // Considera el repositorio como vacío si hay algún error
+        }
+    }
+    
+    //obtener metricas de una org
+    public List<MetricasUsuarioDTO> obtenerMetricasOrganizacion(String organizacion, List<String> usuarios, String accessToken, List<Integer> estudiantesIds) {
+        List<String> repositorios = obtenerRepositorios(organizacion, accessToken);
+        Map<String, MetricasUsuarioDTO> aggregatedMetrics = new HashMap<>();
+
+        // Asociar nombres a los usuarios usando los IDs de estudiantes
+        Map<String, String> usernameToNombre = estudianteRepository.findAllById(estudiantesIds)
+                .stream()
+                .collect(Collectors.toMap(Estudiante::getGitUsername, Estudiante::getNombre));
+
+        // Inicializar métricas agrupadas con nombres de usuario
+        for (String usuario : usuarios) {
+            String nombre = usernameToNombre.getOrDefault(usuario, "Desconocido");
+
+            MetricasUsuarioDTO metrics = new MetricasUsuarioDTO();
+            metrics.setUsername(usuario);
+            metrics.setNombre(nombre);
+            aggregatedMetrics.put(usuario, metrics);
+        }
+
+        // Iterar sobre repositorios
+        for (String repo : repositorios) {
+            if (isRepositorioVacio(organizacion, repo, accessToken)) {
+                System.out.println("Repositorio vacío omitido: " + repo);
+                continue;
+            }
+
+            List<MetricasUsuarioDTO> repoMetrics = obtenerMetricasRepositorio(organizacion, repo, usuarios, accessToken);
+            for (MetricasUsuarioDTO repoMetric : repoMetrics) {
+                MetricasUsuarioDTO aggregatedMetric = aggregatedMetrics.get(repoMetric.getUsername());
+                aggregatedMetric.setTotalCommits(aggregatedMetric.getTotalCommits() + repoMetric.getTotalCommits());
+                aggregatedMetric.setLinesAdded(aggregatedMetric.getLinesAdded() + repoMetric.getLinesAdded());
+                aggregatedMetric.setLinesRemoved(aggregatedMetric.getLinesRemoved() + repoMetric.getLinesRemoved());
+                aggregatedMetric.setPullRequestsCreated(aggregatedMetric.getPullRequestsCreated() + repoMetric.getPullRequestsCreated());
+            }
+        }
+
+        return new ArrayList<>(aggregatedMetrics.values());
+    }
+
+    
+    
+
+    
 }

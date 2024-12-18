@@ -1,8 +1,11 @@
 package tfg.backend_tfg.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import tfg.backend_tfg.model.Equipo;
@@ -14,5 +17,6 @@ public interface EquipoRepository extends JpaRepository<Equipo, Integer> {
     List<Equipo> findByCursoId(int cursoId);
 
     List<Equipo> findByEvaluadorId(int evaluadorId);
+
 }
 

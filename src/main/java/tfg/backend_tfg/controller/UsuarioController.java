@@ -111,12 +111,6 @@ public class UsuarioController {
         return usuarioService.getUsuarioById(id);
     }
 
-    /* 
-    @DeleteMapping("/{id}")
-    public void deleteUsuario(@PathVariable int id) {
-        usuarioService.deleteUsuario(id);
-    }*/
-
     @GetMapping("/datos")
     public ResponseEntity<?> getDatosUsuario() {
         try {
@@ -144,53 +138,6 @@ public class UsuarioController {
             response.put("taigaUsername", usuario.getTaigaUsername());
 
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/github/callback") //MOVER A GITHUBCONTROLLER
-    public ResponseEntity<?> handleGitHubCallback(@RequestBody Map<String, String> requestBody) {
-        try {
-            // Obtener la información de autenticación desde el SecurityContextHolder
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(403).body("Usuario no autenticado.");
-            }
-
-            // Obtener el correo del usuario autenticado
-            String email = authentication.getName();
-
-            // Buscar el usuario en la base de datos usando el correo electrónico
-            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
-            if (usuarioOpt.isEmpty()) {
-                return ResponseEntity.status(404).body("Usuario no encontrado");
-            }
-
-            // Obtener el código de autorización de GitHub
-            String code = requestBody.get("code");
-            System.out.println("codee: " + code);
-            if (code == null || code.isEmpty()) {
-                return ResponseEntity.status(400).body("Código de GitHub no proporcionado");
-            }
-
-            // Obtener el nombre de usuario de GitHub y el access token usando el código
-            Pair<String, String> githubData = githubService.obtenerNombreUsuarioGitHub(code);
-            if (githubData == null) {
-                return ResponseEntity.status(500).body("No se pudo obtener el nombre de usuario o el access token de GitHub.");
-            }
-
-            String githubUsername = githubData.getFirst();
-            String accessToken = githubData.getSecond();
-
-            // Actualizar el usuario con el gitUsername y accessToken obtenido
-            Usuario usuario = usuarioOpt.get();
-            usuario.setGitUsername(githubUsername);
-            usuario.setGithubAccessToken(accessToken);
-            usuarioRepository.save(usuario);
-
-            return ResponseEntity.ok("Cuenta de GitHub asociada exitosamente");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
@@ -266,66 +213,6 @@ public class UsuarioController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
-
-
-    @PostMapping("/taiga/connect")
-public ResponseEntity<?> connectTaiga(@RequestBody Map<String, String> requestBody) {
-    try {
-        // Obtener la información de autenticación desde el SecurityContextHolder
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(403).body("Usuario no autenticado.");
-        }
-
-        // Obtener el correo del usuario autenticado
-        String email = authentication.getName();
-
-        // Buscar el usuario en la base de datos usando el correo electrónico
-        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
-        if (usuarioOpt.isEmpty()) {
-            return ResponseEntity.status(404).body("Usuario no encontrado");
-        }
-
-        Usuario usuario = usuarioOpt.get();
-
-        // Intentar autenticar el usuario con Taiga usando username/password o GitHub token
-        String taigaAuthToken = null;
-
-        if (requestBody.containsKey("username") && requestBody.containsKey("password")) {
-            // Autenticación con username y password
-            String taigaUsername = requestBody.get("username");
-            String taigaPassword = requestBody.get("password");
-            taigaAuthToken = taigaService.authenticateTaigaUser(taigaUsername, taigaPassword);
-
-            if (taigaAuthToken != null) {
-                usuario.setTaigaUsername(taigaUsername);
-            }
-
-        } else if (requestBody.containsKey("githubAccessToken")) {
-            // Autenticación con GitHub access token
-            String githubAccessToken = requestBody.get("githubAccessToken");
-            taigaAuthToken = taigaService.authenticateTaigaUserWithGitHub(githubAccessToken);
-        }
-
-        if (taigaAuthToken == null) {
-            return ResponseEntity.status(401).body("No se pudo autenticar al usuario en Taiga.");
-        }
-
-        // Actualizar el usuario con el taigaAccessToken obtenido
-        usuario.setTaigaAccessToken(taigaAuthToken);
-        usuarioRepository.save(usuario);
-
-        return ResponseEntity.ok("Cuenta de Taiga asociada exitosamente");
-    } catch (Exception e) {
-        e.printStackTrace();
-        return ResponseEntity.status(500).body("Error interno del servidor: " + e.getMessage());
-    }
-}
-
-
-
-
 
 
 }

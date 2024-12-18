@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
+import java.lang.classfile.constantpool.IntegerEntry;
 import java.util.Collection;
 import java.util.List;
 
@@ -50,12 +51,19 @@ public abstract class Usuario implements UserDetails {
     @Column(name = "taiga_username")
     private String taigaUsername;
 
+    @Column(name = "git_user_id")
+    private Integer gitId;
+
+    @Column(name = "taiga_user_id")
+    private Integer taigaId;
+
+    @Column(name = "github_token")
+    private String githubAccessToken;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "rol", insertable = false, updatable = false) // Evitamos duplicar la columna con el discriminador
     private Rol rol;
 
-    private String githubAccessToken;
-    private String taigaAccessToken;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -89,22 +97,6 @@ public abstract class Usuario implements UserDetails {
 
     @Override
     public String getPassword() {
-        return null; // Asumimos que se usará autenticación con Google.
-    }
-
-    public String getGithubAccessToken() {
-        return githubAccessToken;
-    }
-
-    public void setGithubAccessToken(String accessToken) {
-        this.githubAccessToken = accessToken;
-    }
-
-    public String getTaigaAccessToken(){
-        return taigaAccessToken;
-    }
-
-    public void setTaigaAccessToken(String accessToken) {
-        this.taigaAccessToken = accessToken;
+        return null; // Auth con google no requiere guardar la contraseña
     }
 }

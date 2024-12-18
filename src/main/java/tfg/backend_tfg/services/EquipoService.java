@@ -116,6 +116,8 @@ public class EquipoService {
         int evaluadorId = equipo.getEvaluador().getId();
         String evaluadorNombre = equipo.getEvaluador().getNombre();
         String evaluadorCorreo = equipo.getEvaluador().getCorreo();
+        String gitOrganizacion = equipo.getGitOrganizacion();
+        boolean githubAppInstalada = equipo.isGithubAppInstalada();
 
         // Obtener estudiantes del equipo usando el repositorio
         List<EstudianteDTO> estudiantes = estudianteEquipoRepository.findByEquipoId(id)
@@ -143,10 +145,22 @@ public class EquipoService {
                 evaluadorId,
                 evaluadorNombre,
                 evaluadorCorreo,
-                estudiantes
+                estudiantes,
+                gitOrganizacion,
+                githubAppInstalada
         );
     }
 
+    // Método para encontrar equipo por ID
+    public Equipo obtenerEquipoPorId(Integer equipoId) {
+        return equipoRepository.findById(equipoId)
+                .orElseThrow(() -> new RuntimeException("Equipo no encontrado con ID: " + equipoId));
+    }
+
+    // Método para actualizar un equipo
+    public void actualizarEquipo(Equipo equipo) {
+        equipoRepository.save(equipo);
+    }
     
     
 

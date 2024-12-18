@@ -1,8 +1,20 @@
 package tfg.backend_tfg.services;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
+
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Paths;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import org.apache.http.Consts;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -13,14 +25,20 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.GitHubUserDetails;
+import tfg.backend_tfg.model.Usuario;
+import tfg.backend_tfg.repository.EquipoRepository;
+import tfg.backend_tfg.repository.UsuarioRepository;
 
 @Service
 public class GithubService {
@@ -30,6 +48,148 @@ public class GithubService {
 
     @Value("${github.client.secret}")
     private String clientSecret;
+
+    @Value("${github.app.id}")
+    private String appId;
+
+    @Value("${github.app.privateKeyPath}")
+    private String privateKeyPath;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+    @Autowired
+    private EquipoRepository equipoRepository;
+
+    // 1. Leer la clave privada desde el archivo PEM y convertirla a RSAPrivateKey
+    private RSAPrivateKey getPrivateKey() throws Exception {
+        String privateKeyPEM = new String(java.nio.file.Files.readAllBytes(Paths.get(privateKeyPath)));
+
+        privateKeyPEM = privateKeyPEM
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+
+        byte[] keyBytes = Base64.getDecoder().decode(privateKeyPEM);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return (RSAPrivateKey)keyFactory.generatePrivate(keySpec);
+    }
+
+    // 2. Generar JWT para la GitHub App
+    private String generateJWT() throws Exception {
+        Instant now = Instant.now();
+        RSAPrivateKey privateKey = getPrivateKey();
+
+        Algorithm algorithm = Algorithm.RSA256(null, privateKey); // Clave privada para firmar
+        return JWT.create()
+                .withIssuedAt(now)
+                .withExpiresAt(now.plusSeconds(600)) // 10 minutos de validez
+                .withIssuer(appId)
+                .sign(algorithm);
+    }
+
+    // 3. Obtener el token de instalación usando el installation_id
+    private String getInstallationAccessToken(String installationId) throws Exception {
+        String jwt = generateJWT();
+        String url = String.format("https://api.github.com/app/installations/%s/access_tokens", installationId);
+
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpPost request = new HttpPost(url);
+            request.addHeader("Authorization", "Bearer " + jwt);
+            request.addHeader("Accept", "application/vnd.github+json");
+
+            try (CloseableHttpResponse response = client.execute(request)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                JsonNode json = objectMapper.readTree(responseBody);
+                return json.get("token").asText();
+            }
+        }
+    }
+
+    // 4. obtener installation id
+    private String getInstallationId(String organizacion) throws Exception {
+        String jwt = generateJWT();
+        String url = "https://api.github.com/app/installations";
+
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            request.addHeader("Authorization", "Bearer " + jwt);
+            request.addHeader("Accept", "application/vnd.github+json");
+
+            try (CloseableHttpResponse response = client.execute(request)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                JsonNode installations = objectMapper.readTree(responseBody);
+
+                for (JsonNode installation : installations) {
+                    if (installation.get("account").get("login").asText().equals(organizacion)) {
+                        return installation.get("id").asText();
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("No se encontró el Installation ID para la organización: " + organizacion);
+    }
+
+    // 5. validar org
+    public Map<String, Boolean> validarOrganizacion(Integer profesorId, List<Integer> miembrosIds, String organizacionUrl) throws Exception {
+        String organizacion = organizacionUrl.replace("https://github.com/", "").replaceAll("/$", "");
+        String installationId = getInstallationId(organizacion);
+        String accessToken = getInstallationAccessToken(installationId);
+
+        // Obtener git_username de los miembros
+        List<String> miembrosGitUsernames = usuarioRepository.findAllById(miembrosIds)
+                .stream()
+                .map(Usuario::getGitUsername)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        // Obtener git_username del profesor
+        Usuario profesor = usuarioRepository.findById(profesorId)
+                .orElseThrow(() -> new RuntimeException("Profesor no encontrado."));
+        String profesorGitUsername = profesor.getGitUsername();
+
+        if (profesorGitUsername == null) {
+            throw new RuntimeException("El profesor no tiene una cuenta de GitHub configurada.");
+        }
+
+        // Validar si todos los miembros y el profesor pertenecen a la organización
+        Map<String, Boolean> resultadoValidacion = new HashMap<>();
+        resultadoValidacion.put("todosUsuariosGitConfigurados", miembrosGitUsernames.size() == miembrosIds.size());
+        resultadoValidacion.put("profesorGitConfigurado", profesorGitUsername != null);
+
+        String url = String.format("https://api.github.com/orgs/%s/members", organizacion);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            request.addHeader("Authorization", "Bearer " + accessToken);
+            request.addHeader("Accept", "application/vnd.github+json");
+
+            try (CloseableHttpResponse response = client.execute(request)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                JsonNode members = objectMapper.readTree(responseBody);
+                List<String> miembrosOrg = members.findValuesAsText("login");
+
+                // Validar miembros
+                boolean todosMiembrosValidos = miembrosOrg.containsAll(miembrosGitUsernames);
+                boolean profesorValido = miembrosOrg.contains(profesorGitUsername);
+
+                resultadoValidacion.put("todosMiembrosEnOrganizacion", todosMiembrosValidos);
+                resultadoValidacion.put("profesorEnOrganizacion", profesorValido);
+            }
+        }
+
+        return resultadoValidacion;
+    }
+
+    // 6. modificar bd
+    public void asignarOrganizacion(Integer equipoId, String organizacionUrl) {
+        Equipo equipo = equipoRepository.findById(equipoId)
+            .orElseThrow(() -> new IllegalStateException("Equipo no encontrado"));
+
+        equipo.setGitOrganizacion(organizacionUrl.replace("https://github.com/", "").replaceAll("/$", ""));
+        equipoRepository.save(equipo);
+    }
 
     public Pair<String, String> obtenerNombreUsuarioGitHub(String code) {
         String accessTokenUrl = "https://github.com/login/oauth/access_token";

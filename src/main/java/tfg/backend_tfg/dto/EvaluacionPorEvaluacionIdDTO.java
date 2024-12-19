@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class EvaluacionResumenDTO {
-    private Integer evaluadoId;
-    private List<EvaluacionPorEvaluacionIdDTO> evaluaciones;
-    
+public class EvaluacionPorEvaluacionIdDTO {
+    private Integer evaluacionId;
+    private List<EvaluacionDTO> detalles;
+
 }

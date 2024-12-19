@@ -7,6 +7,7 @@ import tfg.backend_tfg.dto.CrearEvaluacionDTO;
 import tfg.backend_tfg.dto.EvaluacionDTO;
 import tfg.backend_tfg.dto.EvaluacionDetalleDTO;
 import tfg.backend_tfg.dto.EvaluacionMediaDTO;
+import tfg.backend_tfg.dto.EvaluacionPorEvaluacionIdDTO;
 import tfg.backend_tfg.dto.EvaluacionResumenDTO;
 import tfg.backend_tfg.dto.MediaPorEvaluacionDTO;
 import tfg.backend_tfg.model.Curso;
@@ -99,32 +100,43 @@ public class EvaluacionService {
 
     public List<EvaluacionResumenDTO> obtenerEvaluacionesPorEquipo(Integer equipoId, List<Integer> evaluacionIds) {
         List<EvaluacionDetalle> detalles;
-
+    
         // Si se especifican evaluaciones, filtramos por ellas
         if (evaluacionIds != null && !evaluacionIds.isEmpty()) {
             detalles = detalleRepository.findByEquipoIdAndEvaluacionIdIn(equipoId, evaluacionIds);
         } else {
             detalles = detalleRepository.findByEquipoId(equipoId);
         }
-
-        // Mapear los detalles a una estructura agrupada
+    
+        // Agrupar los detalles por estudiante evaluado
         Map<Integer, List<EvaluacionDetalle>> agrupadosPorEvaluado = detalles.stream()
                 .collect(Collectors.groupingBy(detalle -> detalle.getEvaluado().getId()));
-
-        // Construir la respuesta
+    
         List<EvaluacionResumenDTO> resultado = new ArrayList<>();
-
+    
         for (Map.Entry<Integer, List<EvaluacionDetalle>> entry : agrupadosPorEvaluado.entrySet()) {
             Integer evaluadoId = entry.getKey();
-            List<EvaluacionDTO> evaluaciones = entry.getValue().stream()
-                    .map(detalle -> new EvaluacionDTO(detalle.getEvaluador().getId(), detalle.getPuntos()))
-                    .collect(Collectors.toList());
-
+    
+            // Agrupar las evaluaciones por evaluacionId
+            Map<Integer, List<EvaluacionDetalle>> agrupadosPorEvaluacionId = entry.getValue().stream()
+                    .collect(Collectors.groupingBy(detalle -> detalle.getEvaluacion().getId()));
+    
+            List<EvaluacionPorEvaluacionIdDTO> evaluaciones = new ArrayList<>();
+            for (Map.Entry<Integer, List<EvaluacionDetalle>> evalEntry : agrupadosPorEvaluacionId.entrySet()) {
+                Integer evaluacionId = evalEntry.getKey();
+                List<EvaluacionDTO> detallesEvaluacion = evalEntry.getValue().stream()
+                        .map(detalle -> new EvaluacionDTO(detalle.getEvaluador().getId(), detalle.getPuntos()))
+                        .collect(Collectors.toList());
+    
+                evaluaciones.add(new EvaluacionPorEvaluacionIdDTO(evaluacionId, detallesEvaluacion));
+            }
+    
             resultado.add(new EvaluacionResumenDTO(evaluadoId, evaluaciones));
         }
-
+    
         return resultado;
     }
+    
 
     public List<EvaluacionMediaDTO> obtenerMediasPorEquipo(Integer equipoId) {
         List<EvaluacionDetalle> detalles = detalleRepository.findByEquipoId(equipoId);

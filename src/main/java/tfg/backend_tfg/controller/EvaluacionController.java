@@ -48,10 +48,12 @@ public class EvaluacionController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
-        }        
+        }
+
         List<EvaluacionResumenDTO> evaluaciones = evaluacionService.obtenerEvaluacionesPorEquipo(equipoId, evaluacionIds);
         return ResponseEntity.ok(evaluaciones);
     }
+
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @GetMapping("/equipo/{equipoId}/medias")
@@ -85,11 +87,11 @@ public class EvaluacionController {
         return ResponseEntity.ok(realizada);
     }
 
-
+/* 
     @GetMapping("/{evaluacionId}/detalles")
     public ResponseEntity<List<EvaluacionDetalle>> obtenerDetallesPorEvaluacion(@PathVariable Integer evaluacionId) {
         return ResponseEntity.ok(evaluacionService.obtenerDetallesPorEvaluacion(evaluacionId));
-    }
+    }*/
 
     @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @PostMapping("/estudiante/crear")

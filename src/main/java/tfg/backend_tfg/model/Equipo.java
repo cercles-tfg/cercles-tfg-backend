@@ -45,7 +45,4 @@ public class Equipo {
     @Column(nullable = false)
     private boolean validado;
 
-    @Column(name = "github_app_instalada", nullable = false)
-    private boolean githubAppInstalada;
-
 }

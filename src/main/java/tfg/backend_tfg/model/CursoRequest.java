@@ -17,6 +17,7 @@ public class CursoRequest {
     private List<ProfesorRequest> profesoresAñadir;
     private List<ProfesorRequest> profesoresBorrar;
 
+    private List<EvaluacionRequest> periodosEvaluacion;
 
     // Getters y setters
     public Integer getId() {
@@ -101,5 +102,13 @@ public class CursoRequest {
 
     public void getProfesoresBorrar(List<ProfesorRequest> profesoresBorrar) {
         this.profesoresBorrar = profesoresBorrar;
+    }
+
+    public List<EvaluacionRequest> getPeriodosEvaluacion() {
+        return periodosEvaluacion;
+    }
+
+    public void setPeriodosEvaluacion(List<EvaluacionRequest> periodosEvaluacion) {
+        this.periodosEvaluacion = periodosEvaluacion;
     }
 }

@@ -23,13 +23,12 @@ public class EquipoDetalleDTO {
 
     //Información de github
     private String gitOrganizacion;
-    private boolean githubAppInstalada;
 
     // Constructor completo
     public EquipoDetalleDTO(int id, String nombre, int cursoId, String nombreAsignatura,
                                     int añoInicio, int cuatrimestre, boolean activo,
                                     int evaluadorId, String evaluadorNombre, String evaluadorCorreo,
-                                    List<EstudianteDTO> estudiantes, String gitOrganizacion, boolean githubAppInstalada) {
+                                    List<EstudianteDTO> estudiantes, String gitOrganizacion) {
         this.id = id;
         this.nombre = nombre;
         this.cursoId = cursoId;
@@ -42,7 +41,6 @@ public class EquipoDetalleDTO {
         this.evaluadorCorreo = evaluadorCorreo;
         this.estudiantes = estudiantes;
         this.gitOrganizacion = gitOrganizacion;
-        this.githubAppInstalada = githubAppInstalada;
     }
 
     // Getters y Setters
@@ -140,14 +138,6 @@ public class EquipoDetalleDTO {
 
     public void setGitOrganizacion(String gitOrganizacion) {
         this.gitOrganizacion = gitOrganizacion;
-    }
-
-    public boolean getGithubAppInstalada() {
-        return githubAppInstalada;
-    }
-
-    public void setGithubAppInstalada(boolean githubAppInstalada) {
-        this.githubAppInstalada = githubAppInstalada;
     }
 
 }

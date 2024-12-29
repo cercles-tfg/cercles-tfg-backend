@@ -77,7 +77,13 @@ public class EquipoService {
 
     return equipoRepository.findByCursoId(cursoId)
             .stream()
-            .map(equipo -> new EquipoSummaryDTO(equipo.getId(), equipo.getNombre(), equipo.getCurso().getId(), equipo.getEvaluador().getId()))
+            .map(equipo -> new EquipoSummaryDTO(
+                    equipo.getId(), 
+                    equipo.getNombre(), 
+                    equipo.getCurso().getId(), 
+                    equipo.getEvaluador().getId(),
+                    equipo.getCurso().getNombreAsignatura(),
+                    equipo.getCurso().isActivo()))
             .collect(Collectors.toList());
     }
 
@@ -100,7 +106,13 @@ public class EquipoService {
     
         // Mapear a DTO
         return equiposUnicos.stream()
-                .map(equipo -> new EquipoSummaryDTO(equipo.getId(), equipo.getNombre(), equipo.getCurso().getId(), equipo.getEvaluador().getId()))
+                .map(equipo -> new EquipoSummaryDTO(
+                    equipo.getId(), 
+                    equipo.getNombre(), 
+                    equipo.getCurso().getId(), 
+                    equipo.getEvaluador().getId(),
+                    equipo.getCurso().getNombreAsignatura(),
+                    equipo.getCurso().isActivo()))
                 .collect(Collectors.toList());
     }
     
@@ -117,7 +129,6 @@ public class EquipoService {
         String evaluadorNombre = equipo.getEvaluador().getNombre();
         String evaluadorCorreo = equipo.getEvaluador().getCorreo();
         String gitOrganizacion = equipo.getGitOrganizacion();
-        boolean githubAppInstalada = equipo.isGithubAppInstalada();
 
         // Obtener estudiantes del equipo usando el repositorio
         List<EstudianteDTO> estudiantes = estudianteEquipoRepository.findByEquipoId(id)
@@ -146,8 +157,7 @@ public class EquipoService {
                 evaluadorNombre,
                 evaluadorCorreo,
                 estudiantes,
-                gitOrganizacion,
-                githubAppInstalada
+                gitOrganizacion
         );
     }
 

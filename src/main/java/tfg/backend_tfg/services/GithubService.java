@@ -60,6 +60,8 @@ public class GithubService {
     private EstudianteRepository estudianteRepository;
 
 
+    //1-8 funciones datos de una org
+
     //1. validar la org de un equipo
     public Map<String, Boolean> validarOrganizacion(Integer profesorId, List<Integer> miembrosIds, String organizacionUrl) {
         String organizacion = organizacionUrl.replace("https://github.com/", "").replaceAll("/$", "");
@@ -161,7 +163,6 @@ public class GithubService {
         }
     }
 
-    
     // 4. modificar bd si org está bien
     public void asignarOrganizacion(Integer equipoId, String organizacionUrl) {
         Equipo equipo = equipoRepository.findById(equipoId)
@@ -171,70 +172,6 @@ public class GithubService {
         equipoRepository.save(equipo);
     }
 
-    // 7. obtener el nombre de usuario de github
-    public Pair<String, String> obtenerNombreUsuarioGitHub(String code) {
-        String accessTokenUrl = "https://github.com/login/oauth/access_token";
-        String userApiUrl = "https://api.github.com/user";
-
-        System.out.println("Client ID: " + clientId);
-        System.out.println("Client Secret: " + clientSecret);
-        System.out.println("Authorization Code: " + code);
-
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            // Paso 1: Intercambiar el código por un access token
-            HttpPost tokenRequest = new HttpPost(accessTokenUrl);
-            tokenRequest.setHeader("Accept", "application/json");
-            tokenRequest.setHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            List<NameValuePair> params = new ArrayList<>();
-            params.add(new BasicNameValuePair("client_id", clientId));
-            params.add(new BasicNameValuePair("client_secret", clientSecret));
-            params.add(new BasicNameValuePair("code", code));
-            tokenRequest.setEntity(new UrlEncodedFormEntity(params, Consts.UTF_8));
-
-            try (CloseableHttpResponse response = client.execute(tokenRequest)) {
-                String responseBody = EntityUtils.toString(response.getEntity());
-                System.out.println("Respuesta del token: " + responseBody);
-
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode tokenJson = objectMapper.readTree(responseBody);
-
-                JsonNode accessTokenNode = tokenJson.get("access_token");
-                if (accessTokenNode == null || accessTokenNode.asText().isEmpty()) {
-                    System.err.println("No se encontró el access_token en la respuesta");
-                    return null;
-                }
-
-                String accessToken = accessTokenNode.asText();
-
-                // Paso 2: Usar el access token para obtener el nombre de usuario de GitHub
-                HttpGet userRequest = new HttpGet(userApiUrl);
-                userRequest.setHeader("Authorization", "Bearer " + accessToken);
-                userRequest.setHeader("Accept", "application/json");
-
-                try (CloseableHttpResponse userResponse = client.execute(userRequest)) {
-                    String userResponseBody = EntityUtils.toString(userResponse.getEntity());
-                    System.out.println("Respuesta del usuario: " + userResponseBody);
-
-                    JsonNode userJson = objectMapper.readTree(userResponseBody);
-                    JsonNode loginNode = userJson.get("login");
-
-                    if (loginNode == null || loginNode.asText().isEmpty()) {
-                        System.err.println("No se encontró el nombre de usuario de GitHub en la respuesta");
-                        return null;
-                    }
-
-                    String username = loginNode.asText();
-                    return Pair.of(username, accessToken);
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    
     // 5. Obtener repositorios de la organización
     public List<String> obtenerRepositorios(String organizacion, String accessToken) {
         String url = "https://api.github.com/orgs/" + organizacion + "/repos";
@@ -308,7 +245,6 @@ public class GithubService {
         return new ArrayList<>(metricsMap.values());
     }
     
-
     //7. comprobar si algun repo está vacio
     public boolean isRepositorioVacio(String organizacion, String repo, String accessToken) {
         String repoUrl = "https://api.github.com/repos/" + organizacion + "/" + repo;
@@ -369,7 +305,139 @@ public class GithubService {
     }
 
     
-    
+    //9-13 funciones datos usuario
+
+    // 9. obtener el nombre de usuario de github
+    public Pair<String, String> obtenerNombreUsuarioGitHub(String code) {
+        String accessTokenUrl = "https://github.com/login/oauth/access_token";
+        String userApiUrl = "https://api.github.com/user";
+
+        System.out.println("Client ID: " + clientId);
+        System.out.println("Client Secret: " + clientSecret);
+        System.out.println("Authorization Code: " + code);
+
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            // Paso 1: Intercambiar el código por un access token
+            HttpPost tokenRequest = new HttpPost(accessTokenUrl);
+            tokenRequest.setHeader("Accept", "application/json");
+            tokenRequest.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+            List<NameValuePair> params = new ArrayList<>();
+            params.add(new BasicNameValuePair("client_id", clientId));
+            params.add(new BasicNameValuePair("client_secret", clientSecret));
+            params.add(new BasicNameValuePair("code", code));
+            tokenRequest.setEntity(new UrlEncodedFormEntity(params, Consts.UTF_8));
+
+            try (CloseableHttpResponse response = client.execute(tokenRequest)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                System.out.println("Respuesta del token: " + responseBody);
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode tokenJson = objectMapper.readTree(responseBody);
+
+                JsonNode accessTokenNode = tokenJson.get("access_token");
+                if (accessTokenNode == null || accessTokenNode.asText().isEmpty()) {
+                    System.err.println("No se encontró el access_token en la respuesta");
+                    return null;
+                }
+
+                String accessToken = accessTokenNode.asText();
+
+                // Paso 2: Usar el access token para obtener el nombre de usuario de GitHub
+                HttpGet userRequest = new HttpGet(userApiUrl);
+                userRequest.setHeader("Authorization", "Bearer " + accessToken);
+                userRequest.setHeader("Accept", "application/json");
+
+                try (CloseableHttpResponse userResponse = client.execute(userRequest)) {
+                    String userResponseBody = EntityUtils.toString(userResponse.getEntity());
+                    System.out.println("Respuesta del usuario: " + userResponseBody);
+
+                    JsonNode userJson = objectMapper.readTree(userResponseBody);
+                    JsonNode loginNode = userJson.get("login");
+
+                    if (loginNode == null || loginNode.asText().isEmpty()) {
+                        System.err.println("No se encontró el nombre de usuario de GitHub en la respuesta");
+                        return null;
+                    }
+
+                    String username = loginNode.asText();
+                    return Pair.of(username, accessToken);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    //10. conectar usuario con su github
+    public Map<String, String> handleGitHubCallback(String email, String code) throws Exception {
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+        if (usuarioOpt.isEmpty()) {
+            throw new IllegalArgumentException("Usuario no encontrado");
+        }
+
+        Usuario usuario = usuarioOpt.get();
+        Pair<String, String> githubData = obtenerNombreUsuarioGitHub(code);
+
+        if (githubData == null) {
+            throw new IllegalStateException("Error al obtener datos de GitHub");
+        }
+
+        usuario.setGitUsername(githubData.getFirst());
+        usuario.setGithubAccessToken(githubData.getSecond());
+        usuarioRepository.save(usuario);
+
+        return Map.of("message", "Cuenta de GitHub asociada exitosamente", "githubUsername", githubData.getFirst());
+    }
+
+    //11. buscar datos de github de un usuario
+    public Map<String, Object> obtenerDatosUsuarioGitHub(String email) throws Exception {
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+        if (usuarioOpt.isEmpty() || usuarioOpt.get().getGithubAccessToken() == null) {
+            return null;
+        }
+
+        String accessToken = usuarioOpt.get().getGithubAccessToken();
+
+        String reposUrl = "https://api.github.com/user/repos";
+        String orgsUrl = "https://api.github.com/user/orgs";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+
+        List<Map<String, Object>> repos = fetchGitHubData(reposUrl, entity);
+        List<Map<String, Object>> orgs = fetchGitHubData(orgsUrl, entity);
+
+        return Map.of(
+            "repositorios", repos,
+            "organizaciones", orgs
+        );
+    }
+
+    //12. fetch datos de github
+    private List<Map<String, Object>> fetchGitHubData(String url, HttpEntity<?> entity) {
+        try {
+            ResponseEntity<List> response = new RestTemplate().exchange(url, HttpMethod.GET, entity, List.class);
+            return response.getBody();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return List.of();
+        }
+    }
+
+    //13. desconectar github de usuario 
+    public void desconectarGitHub(String email) {
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+        if (usuarioOpt.isPresent()) {
+            Usuario usuario = usuarioOpt.get();
+            usuario.setGitUsername(null);
+            usuario.setGithubAccessToken(null);
+            usuarioRepository.save(usuario);
+        }
+    }
 
     
 }

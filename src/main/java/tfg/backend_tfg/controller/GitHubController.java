@@ -53,57 +53,6 @@ public class GitHubController {
         this.equipoService = equipoService;
     }
 
-    /* 
-    @GetMapping("/instalacion")
-    public ResponseEntity<?> obtenerUrlInstalacion(@RequestParam Integer equipoId) {
-        try {
-            String callbackUrl = "http://localhost:8080/api/github/callback";
-            String githubAppUrl = String.format(
-                "https://github.com/apps/CERCLES-APP/installations/new?state=%d&redirect_uri=%s",
-                equipoId, callbackUrl
-            );
-            // Actualizar el estado del equipo
-            Equipo equipo = equipoService.obtenerEquipoPorId(equipoId);
-            if (equipo != null) {
-                equipo.setGithubAppInstalada(true);
-                equipoService.actualizarEquipo(equipo);
-                System.out.println("GitHub App marcada como instalada para el equipo ID: " + equipoId);
-            } else {
-                System.err.println("Equipo no encontrado con ID: " + equipoId);
-            }
-            return ResponseEntity.ok(Map.of("url", githubAppUrl));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al generar la URL de instalación.");
-        }
-    }
-    
-    @GetMapping("/callback")
-    public ResponseEntity<Void> handleGithubCallback(
-            @RequestParam("installation_id") String installationId,
-            @RequestParam("state") Integer equipoId) {
-        try {
-            // Actualizar el estado del equipo
-            Equipo equipo = equipoService.obtenerEquipoPorId(equipoId);
-            if (equipo != null) {
-                equipo.setGithubAppInstalada(true);
-                equipoService.actualizarEquipo(equipo);
-                System.out.println("GitHub App marcada como instalada para el equipo ID: " + equipoId);
-            } else {
-                System.err.println("Equipo no encontrado con ID: " + equipoId);
-            }
-    
-            // Redirigir al frontend a la página de equipos
-            String redirectUrl = "http://localhost:3000/equipos";
-            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
-        } catch (Exception e) {
-            System.err.println("Error en el callback de GitHub: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }*/
-    
-
-
-
     @PostMapping("/validar-organizacion")
     public ResponseEntity<?> validarOrganizacion(@RequestBody Map<String, Object> request) {
         try {
@@ -144,56 +93,6 @@ public class GitHubController {
     }
 
 
-    //conectar un usuario con su cuenta de github
-    @PostMapping("/callback")
-    public ResponseEntity<?> handleGitHubCallback(@RequestBody Map<String, String> requestBody) {
-        try {
-            // Validar si el usuario está autenticado
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
-            }
-
-            // Obtener el email del usuario desde el contexto
-            String email = authentication.getName();
-            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
-            if (usuarioOpt.isEmpty()) {
-                return ResponseEntity.status(404).body(Map.of("error", "Usuario no encontrado"));
-            }
-
-            // Validar si se proporciona el código de autorización de GitHub
-            String code = requestBody.get("code");
-            if (code == null || code.isEmpty()) {
-                return ResponseEntity.status(400).body(Map.of("error", "Código de GitHub faltante"));
-            }
-
-            // Obtener el nombre de usuario de GitHub y el token de acceso
-            Pair<String, String> githubData = githubService.obtenerNombreUsuarioGitHub(code);
-            if (githubData == null) {
-                return ResponseEntity.status(500).body(Map.of("error", "Error al obtener datos de GitHub"));
-            }
-
-            // Guardar el nombre de usuario y el token en la base de datos
-            String githubUsername = githubData.getFirst();
-            String accessToken = githubData.getSecond();
-
-            Usuario usuario = usuarioOpt.get();
-            usuario.setGitUsername(githubUsername);
-            usuario.setGithubAccessToken(accessToken);
-            usuarioRepository.save(usuario);
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Cuenta de GitHub asociada exitosamente",
-                "githubUsername", githubUsername
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor"));
-        }
-    }
-
-
-
     @PreAuthorize("hasAuthority('PROFESOR')")
     @GetMapping("/metrics/{organizacion}")
     public ResponseEntity<?> obtenerMetricas(@PathVariable String organizacion, @RequestParam List<Integer> estudiantesIds) {
@@ -224,6 +123,66 @@ public class GitHubController {
     }
 
     
+    @PostMapping("/callback")
+    public ResponseEntity<?> handleGitHubCallback(@RequestBody Map<String, String> requestBody) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
 
+            String email = authentication.getName();
+            String code = requestBody.get("code");
+
+            if (code == null || code.isEmpty()) {
+                return ResponseEntity.status(400).body(Map.of("error", "Código de GitHub faltante"));
+            }
+
+            Map<String, String> result = githubService.handleGitHubCallback(email, code);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
+    @GetMapping("/user-data")
+    public ResponseEntity<?> obtenerDatosGitHub() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
+
+            String email = authentication.getName();
+            Map<String, Object> datosUsuario = githubService.obtenerDatosUsuarioGitHub(email);
+
+            if (datosUsuario == null) {
+                return ResponseEntity.status(404).body(Map.of("error", "Datos no encontrados para este usuario."));
+            }
+
+            return ResponseEntity.ok(datosUsuario);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
+    @DeleteMapping("/disconnect")
+    public ResponseEntity<?> desconectarGitHub() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
+
+            String email = authentication.getName();
+            githubService.desconectarGitHub(email);
+            return ResponseEntity.ok(Map.of("message", "GitHub desconectado exitosamente"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor"));
+        }
+    }
 
 }

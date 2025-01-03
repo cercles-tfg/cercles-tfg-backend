@@ -71,20 +71,20 @@ public class EquipoService {
     }
 
     public List<EquipoSummaryDTO> obtenerEquiposPorCurso(int cursoId) {
-    if (!cursoRepository.existsById(cursoId)) {
-        throw new IllegalArgumentException("El curso especificado no existe.");
-    }
+        if (!cursoRepository.existsById(cursoId)) {
+            throw new IllegalArgumentException("El curso especificado no existe.");
+        }
 
-    return equipoRepository.findByCursoId(cursoId)
-            .stream()
-            .map(equipo -> new EquipoSummaryDTO(
-                    equipo.getId(), 
-                    equipo.getNombre(), 
-                    equipo.getCurso().getId(), 
-                    equipo.getEvaluador().getId(),
-                    equipo.getCurso().getNombreAsignatura(),
-                    equipo.getCurso().isActivo()))
-            .collect(Collectors.toList());
+        return equipoRepository.findByCursoId(cursoId)
+                .stream()
+                .map(equipo -> new EquipoSummaryDTO(
+                        equipo.getId(), 
+                        equipo.getNombre(), 
+                        equipo.getCurso().getId(), 
+                        equipo.getEvaluador().getId(),
+                        equipo.getCurso().getNombreAsignatura(),
+                        equipo.getCurso().isActivo()))
+                .collect(Collectors.toList());
     }
 
     public List<EquipoSummaryDTO> obtenerEquiposPorUsuario(int usuarioId) {

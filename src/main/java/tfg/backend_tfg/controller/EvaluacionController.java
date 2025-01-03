@@ -87,12 +87,6 @@ public class EvaluacionController {
         return ResponseEntity.ok(realizada);
     }
 
-/* 
-    @GetMapping("/{evaluacionId}/detalles")
-    public ResponseEntity<List<EvaluacionDetalle>> obtenerDetallesPorEvaluacion(@PathVariable Integer evaluacionId) {
-        return ResponseEntity.ok(evaluacionService.obtenerDetallesPorEvaluacion(evaluacionId));
-    }*/
-
     @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @PostMapping("/estudiante/crear")
     public ResponseEntity<String> crearEvaluacionDetalle(@RequestBody EvaluacionDetalleRequestDTO request) {

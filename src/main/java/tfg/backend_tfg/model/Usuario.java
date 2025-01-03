@@ -51,9 +51,6 @@ public abstract class Usuario implements UserDetails {
     @Column(name = "taiga_username")
     private String taigaUsername;
 
-    @Column(name = "git_user_id")
-    private Integer gitId;
-
     @Column(name = "taiga_user_id")
     private Integer taigaId;
 

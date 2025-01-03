@@ -2,7 +2,6 @@ package tfg.backend_tfg.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.util.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,20 +11,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import tfg.backend_tfg.dto.MetricasUsuarioDTO;
-import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
-import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.repository.EquipoRepository;
-import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.EstudianteRepository;
-import tfg.backend_tfg.repository.UsuarioRepository;
-import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.GithubService;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -34,23 +25,13 @@ public class GitHubController {
 
     private final GithubService githubService;
     @Autowired
-    private final UsuarioRepository usuarioRepository;
-    @Autowired
     private final EstudianteRepository estudianteRepository;
-    @Autowired
-    private final EquipoRepository equipoRepository;
-    @Autowired
-    private final EquipoService equipoService;
-
     @Value("${professorat-amep.token}")
     private String profAmepToken;
     
-    public GitHubController(GithubService githubService, UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, EquipoRepository equipoRepository, EquipoService equipoService) {
+    public GitHubController(GithubService githubService, EstudianteRepository estudianteRepository) {
         this.githubService = githubService;
-        this.usuarioRepository = usuarioRepository;
         this.estudianteRepository = estudianteRepository;
-        this.equipoRepository = equipoRepository;
-        this.equipoService = equipoService;
     }
 
     @PostMapping("/validar-organizacion")

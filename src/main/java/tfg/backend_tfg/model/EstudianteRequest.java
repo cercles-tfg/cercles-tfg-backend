@@ -3,6 +3,7 @@ package tfg.backend_tfg.model;
 public class EstudianteRequest {
     private String nombre;
     private String correo;
+    private String grupo;
 
     // Getters y setters
     public String getNombre() {
@@ -19,5 +20,13 @@ public class EstudianteRequest {
 
     public void setCorreo(String correo) {
         this.correo = correo;
+    }
+
+    public String getGrupo() {
+        return grupo;
+    }
+
+    public void setGrupo(String grupo) {
+        this.grupo = grupo;
     }
 }

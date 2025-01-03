@@ -148,7 +148,6 @@ public class CursoController {
 
             String email = authentication.getName();
 
-            // Delegar la lógica al servicio
             CursoDetalleDTO cursoDetalle = cursoService.obtenerDetalleCurso(id, email);
 
             return ResponseEntity.ok(cursoDetalle);
@@ -219,7 +218,7 @@ public class CursoController {
 
 
 
-    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')") //PERFE
+    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
     @GetMapping("/{cursoId}/equipos")
     public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposPorCurso(@PathVariable int cursoId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

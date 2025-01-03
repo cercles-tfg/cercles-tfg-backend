@@ -23,24 +23,26 @@ public class TaigaService {
     }
 
     private String obtenerTokenNormal(String username, String password) {
-            try {
-                String url = TAIGA_API_BASE_URL + "/auth";
-                Map<String, String> body = Map.of(
-                    "type", "normal",
-                    "username", username,
-                    "password", password
-                );
-
-                ResponseEntity<Map> response = restTemplate.postForEntity(url, body, Map.class);
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                    return (String) response.getBody().get("auth_token");
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            String url = TAIGA_API_BASE_URL + "/auth";
+            Map<String, String> body = Map.of(
+                "type", "normal",
+                "username", username,
+                "password", password
+            );
+    
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, body, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return (String) response.getBody().get("auth_token");
+            } else {
+                System.err.println("Error en autenticación normal: " + response.getStatusCode());
+                System.err.println("Cuerpo de respuesta: " + response.getBody());
             }
-            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
+        return null;
+    }
     public Map<String, Object> authenticateTaigaUserWithGitHub(String token) {
         String authToken = obtenerTokenGitHub(token);
         return authToken != null ? obtenerUsuarioActual(authToken) : null;
@@ -51,12 +53,15 @@ public class TaigaService {
             String url = TAIGA_API_BASE_URL + "/auth";
             Map<String, String> body = Map.of(
                 "type", "github",
-                "token", token
+                "code", token
             );
-
+    
             ResponseEntity<Map> response = restTemplate.postForEntity(url, body, Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return (String) response.getBody().get("auth_token");
+            } else {
+                System.err.println("Error en autenticación con GitHub: " + response.getStatusCode());
+                System.err.println("Cuerpo de respuesta: " + response.getBody());
             }
         } catch (Exception e) {
             e.printStackTrace();

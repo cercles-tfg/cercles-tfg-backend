@@ -2,11 +2,15 @@ package tfg.backend_tfg.services;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -67,7 +71,7 @@ public class CursoService {
     @Autowired
     private EvaluacionRepository evaluacionRepository;
 
-    //Leer estudiantes del excel
+    //Leer estudiantes del excel con validaciones
     public ResponseEntity<?> uploadEstudiantes(MultipartFile file) {
         try {
             if (file.isEmpty() || !file.getOriginalFilename().endsWith(".xlsx")) {
@@ -75,37 +79,91 @@ public class CursoService {
             }
 
             List<Map<String, String>> estudiantes = new ArrayList<>();
+            Set<String> correosExistentes = new HashSet<>();
+            List<String> errores = new ArrayList<>();
+            
             Workbook workbook = new XSSFWorkbook(file.getInputStream());
             Sheet sheet = workbook.getSheetAt(0);
 
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row != null) {
-                    String cognomsNom = row.getCell(0).getStringCellValue();
-                    String correo = row.getCell(1).getStringCellValue();
-
+                    // Verificar si la fila está completamente vacía
+                    boolean isRowEmpty = true;
+                    for (int cellIndex = 0; cellIndex < 3; cellIndex++) {
+                        Cell cell = row.getCell(cellIndex);
+                        if (cell != null && cell.getCellType() != CellType.BLANK && !cell.toString().trim().isEmpty()) {
+                            isRowEmpty = false;
+                            break;
+                        }
+                    }
+            
+                    // Si la fila está completamente vacía, continuar con la siguiente
+                    if (isRowEmpty) {
+                        continue;
+                    }
+            
+                    // Obtener los valores de las celdas
+                    String grupo = row.getCell(0) != null ? row.getCell(0).getStringCellValue().trim() : null;
+                    String cognomsNom = row.getCell(1) != null ? row.getCell(1).getStringCellValue().trim() : null;
+                    String correo = row.getCell(2) != null ? row.getCell(2).getStringCellValue().trim() : null;
+            
+                    // Validar que no hay datos incompletos
+                    if (grupo == null || cognomsNom == null || correo == null) {
+                        errores.add("Fila " + (i + 1) + ": Faltan datos obligatorios (grupo, nombre o correo).");
+                        continue;
+                    }
+            
+                    // Validar el formato del correo electrónico
+                    if (!correo.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+                        errores.add("Fila " + (i + 1) + ": Correo electrónico con formato incorrecto.");
+                        continue;
+                    }
+            
+                    // Validar duplicados por correo electrónico
+                    if (correosExistentes.contains(correo)) {
+                        errores.add("Fila " + (i + 1) + ": Correo duplicado (" + correo + ").");
+                        continue;
+                    }
+            
+                    correosExistentes.add(correo);
+            
+                    // Separar apellidos y nombre
                     String[] partes = cognomsNom.split(",");
                     if (partes.length < 2) {
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Formato incorrecto en la fila " + (i + 1));
+                        errores.add("Fila " + (i + 1) + ": Formato incorrecto en el nombre y apellidos.");
+                        continue;
                     }
-
+            
                     String apellidos = partes[0].trim();
                     String nombre = partes[1].trim();
                     String nombreCompleto = nombre + " " + apellidos;
-
+            
+                    // Agregar estudiante a la lista
                     Map<String, String> estudianteData = new HashMap<>();
                     estudianteData.put("nombre", nombreCompleto);
                     estudianteData.put("correo", correo);
+                    estudianteData.put("grupo", grupo);
                     estudiantes.add(estudianteData);
                 }
-            }
+            }            
             workbook.close();
+
+            // Si hay errores, devolverlos en la respuesta
+            if (!errores.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "message", "Se encontraron errores en el archivo.",
+                    "errores", errores
+                ));
+            }
+
             return ResponseEntity.ok(estudiantes);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al procesar el archivo: " + e.getMessage());
         }
     }
+
 
     //Crear curso
     public ResponseEntity<?> crearCurso(CursoRequest cursoRequest, String profesorEmail) {
@@ -342,7 +400,7 @@ public class CursoService {
         for (EstudianteRequest estudianteRequest : estudiantesAñadir) {
             Usuario usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
             if (usuarioExistente == null) {
-                // Llamar al servicio para crear el usuario
+                // Llamar al servicio para crear el usuario si todavia no existe
                 UsuarioRequest usuarioRequest = new UsuarioRequest();
                 usuarioRequest.setCorreo(estudianteRequest.getCorreo());
                 usuarioRequest.setNombre(estudianteRequest.getNombre());
@@ -358,7 +416,7 @@ public class CursoService {
                 usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
             }
             // Asociar al estudiante con el curso
-            EstudianteCurso estudianteCurso = new EstudianteCurso((Estudiante) usuarioExistente, cursoExistente);
+            EstudianteCurso estudianteCurso = new EstudianteCurso((Estudiante) usuarioExistente, cursoExistente, estudianteRequest.getGrupo());
             estudianteCursoRepository.save(estudianteCurso);
         }
         return ResponseEntity.ok().build();

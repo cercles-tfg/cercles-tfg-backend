@@ -60,8 +60,6 @@ public class EquipoController {
         }
     }
     
-
-
     @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @PostMapping("/crear")
     public ResponseEntity<String> crearEquipo(@RequestBody CrearEquipoDTO crearEquipoDTO) {
@@ -130,7 +128,7 @@ public class EquipoController {
     }
 
     @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
-    @PostMapping("/{id}/añadir_miembros")
+    @PostMapping("/{id}/add_member")
     public ResponseEntity<String> añadirMiembros(@PathVariable int id, @RequestBody Map<String, List<Integer>> body) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

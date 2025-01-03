@@ -187,64 +187,6 @@ public class GithubService {
         return repositorios;
     }
 
-    //6. obtener metricas de un repo
-    public List<MetricasUsuarioDTO> obtenerMetricasRepositorio(String organizacion, String repo, List<String> usuarios, String accessToken) {
-        if (isRepositorioVacio(organizacion, repo, accessToken)) {
-            System.out.println("El repositorio " + repo + " está vacío. Se omite.");
-            return Collections.emptyList();
-        }
-    
-        String commitsUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/commits";
-        String pullsUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/pulls";
-    
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
-        headers.set("Accept", "application/vnd.github+json");
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-    
-        Map<String, MetricasUsuarioDTO> metricsMap = new HashMap<>();
-    
-        for (String usuario : usuarios) {
-            MetricasUsuarioDTO metrics = new MetricasUsuarioDTO();
-            metrics.setUsername(usuario);
-            metricsMap.put(usuario, metrics);
-        }
-    
-        try {
-            // Obtener commits y estadísticas
-            ResponseEntity<JsonNode> commitsResponse = restTemplate.exchange(commitsUrl, HttpMethod.GET, entity, JsonNode.class);
-            for (JsonNode commit : commitsResponse.getBody()) {
-                String author = commit.path("author").path("login").asText();
-                if (metricsMap.containsKey(author)) {
-                    MetricasUsuarioDTO metrics = metricsMap.get(author);
-                    metrics.setTotalCommits(metrics.getTotalCommits() + 1);
-    
-                    // Obtener detalles del commit
-                    String commitUrl = commit.path("url").asText();
-                    ResponseEntity<JsonNode> commitDetails = restTemplate.exchange(commitUrl, HttpMethod.GET, entity, JsonNode.class);
-                    JsonNode stats = commitDetails.getBody().path("stats");
-    
-                    metrics.setLinesAdded(metrics.getLinesAdded() + stats.path("additions").asInt());
-                    metrics.setLinesRemoved(metrics.getLinesRemoved() + stats.path("deletions").asInt());
-                }
-            }
-    
-            // Obtener Pull Requests
-            ResponseEntity<JsonNode> pullsResponse = restTemplate.exchange(pullsUrl, HttpMethod.GET, entity, JsonNode.class);
-            for (JsonNode pull : pullsResponse.getBody()) {
-                String author = pull.path("user").path("login").asText();
-                if (metricsMap.containsKey(author)) {
-                    MetricasUsuarioDTO metrics = metricsMap.get(author);
-                    metrics.setPullRequestsCreated(metrics.getPullRequestsCreated() + 1);
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error al obtener métricas del repositorio " + repo + ": " + e.getMessage());
-        }
-    
-        return new ArrayList<>(metricsMap.values());
-    }
-    
     //7. comprobar si algun repo está vacio
     public boolean isRepositorioVacio(String organizacion, String repo, String accessToken) {
         String repoUrl = "https://api.github.com/repos/" + organizacion + "/" + repo;
@@ -263,46 +205,176 @@ public class GithubService {
             return true; // Considera el repositorio como vacío si hay algún error
         }
     }
+
+    //6. obtener metricas de un repo
+    public Map<String, Object> obtenerMetricasRepositorio(String organizacion, String repo, List<String> usuarios, String accessToken) {
+        if (isRepositorioVacio(organizacion, repo, accessToken)) {
+            System.out.println("El repositorio " + repo + " está vacío. Se omite.");
+            return Collections.emptyMap();
+        }
+    
+        String commitsUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/commits";
+        String pullsUrl = "https://api.github.com/search/issues?q=is:pr+repo:" + organizacion + "/" + repo + "&per_page=100";
+        String issuesUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/issues?state=all&per_page=100";
+    
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/vnd.github+json");
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+    
+        List<String> globalIssueDetails = new ArrayList<>();
+        Map<String, MetricasUsuarioDTO> metricsMap = new HashMap<>();
+        for (String usuario : usuarios) {
+            metricsMap.put(usuario, new MetricasUsuarioDTO(usuario));
+        }
+    
+        try {
+            // Obtener commits
+            ResponseEntity<JsonNode> commitsResponse = restTemplate.exchange(commitsUrl, HttpMethod.GET, entity, JsonNode.class);
+            for (JsonNode commit : commitsResponse.getBody()) {
+                String author = commit.path("author").path("login").asText();
+                if (metricsMap.containsKey(author)) {
+                    MetricasUsuarioDTO metrics = metricsMap.get(author);
+                    metrics.setTotalCommits(metrics.getTotalCommits() + 1);
+    
+                    String commitUrl = commit.path("url").asText();
+                    ResponseEntity<JsonNode> commitDetails = restTemplate.exchange(commitUrl, HttpMethod.GET, entity, JsonNode.class);
+                    JsonNode stats = commitDetails.getBody().path("stats");
+    
+                    metrics.setLinesAdded(metrics.getLinesAdded() + stats.path("additions").asInt());
+                    metrics.setLinesRemoved(metrics.getLinesRemoved() + stats.path("deletions").asInt());
+                }
+            }
+    
+            // Obtener Pull Requests
+            ResponseEntity<JsonNode> pullsResponse = restTemplate.exchange(pullsUrl, HttpMethod.GET, entity, JsonNode.class);
+            for (JsonNode pull : pullsResponse.getBody().path("items")) {
+                String author = pull.path("user").path("login").asText();
+                if (metricsMap.containsKey(author)) {
+                    MetricasUsuarioDTO metrics = metricsMap.get(author);
+                    metrics.setPullRequestsCreated(metrics.getPullRequestsCreated() + 1);
+                }
+            }
+    
+            // Obtener Issues y Métricas Globales
+            Map<String, Object> repoGlobalMetrics = obtenerMetricasGlobalesIssues(issuesUrl, usuarios, metricsMap, entity);
+    
+            // Agregar detalles de issues al listado global
+            globalIssueDetails.addAll((List<String>) repoGlobalMetrics.get("issueDetails"));
+    
+        } catch (Exception e) {
+            System.err.println("Error al obtener métricas del repositorio " + repo + ": " + e.getMessage());
+        }
+    
+        Map<String, Object> result = new HashMap<>();
+        result.put("userMetrics", new ArrayList<>(metricsMap.values()));
+        result.put("globalIssueDetails", globalIssueDetails);
+    
+        return result;
+    }
+    
+    
+    
+
+    //7. get issues globales
+    public Map<String, Object> obtenerMetricasGlobalesIssues(String issuesUrl, List<String> usuarios, Map<String, MetricasUsuarioDTO> metricsMap, HttpEntity<?> entity) {
+        List<String> issueDetails = new ArrayList<>();
+    
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(issuesUrl, HttpMethod.GET, entity, JsonNode.class);
+            JsonNode issues = response.getBody();
+    
+            for (JsonNode issue : issues) {
+                String number = issue.path("number").asText();
+                String title = issue.path("title").asText();
+                String state = issue.path("state").asText();
+                boolean isClosed = state.equals("closed");
+                String author = issue.path("user").path("login").asText();
+                List<String> assignees = new ArrayList<>();
+                issue.path("assignees").forEach(a -> assignees.add(a.path("login").asText()));
+                List<String> labels = new ArrayList<>();
+                issue.path("labels").forEach(label -> labels.add(label.path("name").asText()));
+    
+                boolean isUserStory = labels.contains("user story") || labels.contains("historia de usuario") || labels.contains("història d'usuari");
+                boolean isTask = labels.contains("task") || labels.contains("tarea") || labels.contains("tasca");
+    
+                if (isUserStory || isTask) {
+                    // Generar detalles para globalIssueDetails
+                    String labelType = isUserStory ? "user story" : "task";
+                    String issueDetail = "[" + number + "] " + title + ", Labels: " + labelType + ", Closed: " + isClosed + ", Created by: " + author + ", Assignees: " + assignees;
+                    issueDetails.add(issueDetail);
+    
+                    // Asignar métricas individuales si un usuario es asignado
+                    for (String assignee : assignees) {
+                        if (metricsMap.containsKey(assignee)) {
+                            MetricasUsuarioDTO metrics = metricsMap.get(assignee);
+                            if (isUserStory) {
+                                metrics.setUserStories(metrics.getUserStories() + 1);
+                                if (isClosed) {
+                                    metrics.setUserStoriesClosed(metrics.getUserStoriesClosed() + 1);
+                                }
+                            }
+                            if (isTask) {
+                                metrics.setTasks(metrics.getTasks() + 1);
+                                if (isClosed) {
+                                    metrics.setTasksClosed(metrics.getTasksClosed() + 1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error al obtener issues: " + e.getMessage());
+        }
+    
+        Map<String, Object> result = new HashMap<>();
+        result.put("issueDetails", issueDetails);
+    
+        return result;
+    }
+    
     
     //8. obtener metricas de una org
-    public List<MetricasUsuarioDTO> obtenerMetricasOrganizacion(String organizacion, List<String> usuarios, String accessToken, List<Integer> estudiantesIds) {
+    public Map<String, Object> obtenerMetricasOrganizacion(String organizacion, List<String> usuarios, String accessToken, List<Integer> estudiantesIds) {
         List<String> repositorios = obtenerRepositorios(organizacion, accessToken);
-        Map<String, MetricasUsuarioDTO> aggregatedMetrics = new HashMap<>();
-
-        // Asociar nombres a los usuarios usando los IDs de estudiantes
+    
+        List<String> globalIssueDetails = new ArrayList<>();
         Map<String, String> usernameToNombre = estudianteRepository.findAllById(estudiantesIds)
                 .stream()
                 .collect(Collectors.toMap(Estudiante::getGitUsername, Estudiante::getNombre));
-
-        // Inicializar métricas agrupadas con nombres de usuario
+    
+        Map<String, MetricasUsuarioDTO> aggregatedMetrics = new HashMap<>();
         for (String usuario : usuarios) {
             String nombre = usernameToNombre.getOrDefault(usuario, "Desconocido");
-
-            MetricasUsuarioDTO metrics = new MetricasUsuarioDTO();
-            metrics.setUsername(usuario);
-            metrics.setNombre(nombre);
-            aggregatedMetrics.put(usuario, metrics);
+            aggregatedMetrics.put(usuario, new MetricasUsuarioDTO(nombre, usuario));
         }
-
-        // Iterar sobre repositorios
+    
         for (String repo : repositorios) {
             if (isRepositorioVacio(organizacion, repo, accessToken)) {
                 System.out.println("Repositorio vacío omitido: " + repo);
                 continue;
             }
-
-            List<MetricasUsuarioDTO> repoMetrics = obtenerMetricasRepositorio(organizacion, repo, usuarios, accessToken);
-            for (MetricasUsuarioDTO repoMetric : repoMetrics) {
-                MetricasUsuarioDTO aggregatedMetric = aggregatedMetrics.get(repoMetric.getUsername());
-                aggregatedMetric.setTotalCommits(aggregatedMetric.getTotalCommits() + repoMetric.getTotalCommits());
-                aggregatedMetric.setLinesAdded(aggregatedMetric.getLinesAdded() + repoMetric.getLinesAdded());
-                aggregatedMetric.setLinesRemoved(aggregatedMetric.getLinesRemoved() + repoMetric.getLinesRemoved());
-                aggregatedMetric.setPullRequestsCreated(aggregatedMetric.getPullRequestsCreated() + repoMetric.getPullRequestsCreated());
+    
+            Map<String, Object> repoMetrics = obtenerMetricasRepositorio(organizacion, repo, usuarios, accessToken);
+            List<MetricasUsuarioDTO> userMetrics = (List<MetricasUsuarioDTO>) repoMetrics.get("userMetrics");
+            List<String> repoIssueDetails = (List<String>) repoMetrics.get("globalIssueDetails");
+    
+            for (MetricasUsuarioDTO userMetric : userMetrics) {
+                MetricasUsuarioDTO aggregatedMetric = aggregatedMetrics.get(userMetric.getUsername());
+                aggregatedMetric.combine(userMetric);
             }
+    
+            globalIssueDetails.addAll(repoIssueDetails);
         }
-
-        return new ArrayList<>(aggregatedMetrics.values());
+    
+        Map<String, Object> result = new HashMap<>();
+        result.put("userMetrics", new ArrayList<>(aggregatedMetrics.values()));
+        result.put("globalIssueDetails", globalIssueDetails);
+    
+        return result;
     }
+ 
 
     
     //9-13 funciones datos usuario

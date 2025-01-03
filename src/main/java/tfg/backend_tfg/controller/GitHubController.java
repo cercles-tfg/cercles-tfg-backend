@@ -91,17 +91,18 @@ public class GitHubController {
                     .collect(Collectors.toList());
 
             // Llamada al servicio con el token personal
-            List<MetricasUsuarioDTO> metricas = githubService.obtenerMetricasOrganizacion(
+            Map<String, Object> metricasOrganizacion = githubService.obtenerMetricasOrganizacion(
                     organizacion, usuarios, profAmepToken, estudiantesIds
             );
 
-            return ResponseEntity.ok(metricas);
+            return ResponseEntity.ok(metricasOrganizacion);
         } catch (Exception e) {
             e.printStackTrace(); // Log completo del error
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
         }
     }
+
 
     
     @PostMapping("/callback")

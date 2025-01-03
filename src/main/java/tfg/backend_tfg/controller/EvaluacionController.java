@@ -19,6 +19,7 @@ import tfg.backend_tfg.repository.EvaluacionDetalleRepository;
 import tfg.backend_tfg.services.EvaluacionService;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/evaluaciones")
@@ -66,11 +67,12 @@ public class EvaluacionController {
         return ResponseEntity.ok(medias);
     }
 
-    @GetMapping("/equipo/{equipoId}/evaluacion-activa")
-    public ResponseEntity<Boolean> isEvaluacionActiva(@PathVariable Integer equipoId) {
-        boolean activa = evaluacionService.isEvaluacionActiva(equipoId);
-        return ResponseEntity.ok(activa);
+    @GetMapping("/equipo/{equipoId}/evaluacion-activa") //Cambiar swagger
+    public ResponseEntity<Map<String, Object>> getEvaluacionActiva(@PathVariable Integer equipoId) {
+        Map<String, Object> response = evaluacionService.getEvaluacionActiva(equipoId);
+        return ResponseEntity.ok(response);
     }
+
 
     @GetMapping("/equipo/{equipoId}/evaluacion-activa-id")
     public ResponseEntity<Integer> obtenerEvaluacionActivaId(@PathVariable Integer equipoId) {

@@ -1,5 +1,8 @@
 package tfg.backend_tfg.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MetricasUsuarioDTO {
     private String nombre;
     private String username;
@@ -7,6 +10,38 @@ public class MetricasUsuarioDTO {
     private int linesAdded;
     private int linesRemoved;
     private int pullRequestsCreated;
+
+    // Issues específicos por usuario
+    private int userStories;
+    private int userStoriesClosed;
+    private int tasks;
+    private int tasksClosed;
+
+    // Constructor vacío
+    public MetricasUsuarioDTO() {}
+
+    // Constructor con username
+    public MetricasUsuarioDTO(String username) {
+        this.username = username;
+    }
+
+    // Constructor con nombre y username
+    public MetricasUsuarioDTO(String nombre, String username) {
+        this.nombre = nombre;
+        this.username = username;
+    }
+
+    // Método para combinar métricas de otro DTO
+    public void combine(MetricasUsuarioDTO other) {
+        this.totalCommits += other.totalCommits;
+        this.linesAdded += other.linesAdded;
+        this.linesRemoved += other.linesRemoved;
+        this.pullRequestsCreated += other.pullRequestsCreated;
+        this.userStories += other.userStories;
+        this.userStoriesClosed += other.userStoriesClosed;
+        this.tasks += other.tasks;
+        this.tasksClosed += other.tasksClosed;
+    }
 
     @Override
     public String toString() {
@@ -16,6 +51,10 @@ public class MetricasUsuarioDTO {
                 ", linesAdded=" + linesAdded +
                 ", linesRemoved=" + linesRemoved +
                 ", pullRequestsCreated=" + pullRequestsCreated +
+                ", userStories=" + userStories +
+                ", userStoriesClosed=" + userStoriesClosed +
+                ", tasks=" + tasks +
+                ", tasksClosed=" + tasksClosed +
                 '}';
     }
 
@@ -51,7 +90,7 @@ public class MetricasUsuarioDTO {
         this.linesAdded = linesAdded;
     }
 
-    public int getLinesRemoved() { 
+    public int getLinesRemoved() {
         return linesRemoved;
     }
 
@@ -67,4 +106,35 @@ public class MetricasUsuarioDTO {
         this.pullRequestsCreated = pullRequestsCreated;
     }
 
+    public int getUserStories() {
+        return userStories;
+    }
+
+    public void setUserStories(int userStories) {
+        this.userStories = userStories;
+    }
+
+    public int getUserStoriesClosed() {
+        return userStoriesClosed;
+    }
+
+    public void setUserStoriesClosed(int userStoriesClosed) {
+        this.userStoriesClosed = userStoriesClosed;
+    }
+
+    public int getTasks() {
+        return tasks;
+    }
+
+    public void setTasks(int tasks) {
+        this.tasks = tasks;
+    }
+
+    public int getTasksClosed() {
+        return tasksClosed;
+    }
+
+    public void setTasksClosed(int tasksClosed) {
+        this.tasksClosed = tasksClosed;
+    }
 }

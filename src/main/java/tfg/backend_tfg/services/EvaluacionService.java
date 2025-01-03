@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -192,19 +193,32 @@ public class EvaluacionService {
         return resultado;
     }
     
-    public boolean isEvaluacionActiva(Integer equipoId) {
+    public Map<String, Object> getEvaluacionActiva(Integer equipoId) {
         Curso curso = equipoRepository.findByEquipoId(equipoId);
-    
+
         if (curso == null) {
             throw new IllegalArgumentException("El equipo no tiene un curso asociado");
         }
-    
+
         List<Evaluacion> evaluaciones = evaluacionRepository.findByCursoId(curso.getId());
         LocalDate today = LocalDate.now();
-    
-        return evaluaciones.stream()
-                .anyMatch(evaluacion -> !today.isBefore(evaluacion.getFechaInicio()) && !today.isAfter(evaluacion.getFechaFin()));
+
+        for (Evaluacion evaluacion : evaluaciones) {
+            if (!today.isBefore(evaluacion.getFechaInicio()) && !today.isAfter(evaluacion.getFechaFin())) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("activa", true);
+                result.put("fechaInicio", evaluacion.getFechaInicio());
+                result.put("fechaFin", evaluacion.getFechaFin());
+                return result;
+            }
+        }
+
+        // Si no hay evaluación activa, devolver respuesta inactiva
+        Map<String, Object> result = new HashMap<>();
+        result.put("activa", false);
+        return result;
     }
+
     
     public Integer obtenerEvaluacionActiva(Integer equipoId) {
         Curso curso = equipoRepository.findById(equipoId)

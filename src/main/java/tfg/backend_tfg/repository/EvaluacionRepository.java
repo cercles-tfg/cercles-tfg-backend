@@ -13,4 +13,12 @@ public interface EvaluacionRepository extends JpaRepository<Evaluacion, Integer>
 
     @Query("SELECT e FROM Evaluacion e WHERE e.curso.id IN (SELECT ec.curso.id FROM Equipo ec WHERE ec.id = :equipoId)")
     List<Evaluacion> findByEquipoId(@Param("equipoId") Integer equipoId);
+
+    @Query("SELECT COUNT(e) FROM Evaluacion e WHERE e.curso.id = :cursoId")
+    Integer countByCursoId(@Param("cursoId") Integer cursoId);
+
+    @Query("SELECT e.id FROM Evaluacion e WHERE e.curso.id = :cursoId")
+    List<Integer> findIdsByCursoId(@Param("cursoId") Integer cursoId);
+
+
 }

@@ -42,7 +42,6 @@ public class EquipoController {
     private UsuarioRepository usuarioRepository;
 
 
-    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
     @GetMapping("/{equipoId}")
     public ResponseEntity<EquipoDetalleDTO> obtenerEquipoDetalle(@PathVariable int equipoId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -60,7 +59,6 @@ public class EquipoController {
         }
     }
     
-    @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @PostMapping("/crear")
     public ResponseEntity<String> crearEquipo(@RequestBody CrearEquipoDTO crearEquipoDTO) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -92,7 +90,6 @@ public class EquipoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
     @DeleteMapping("/{id}/borrar")
     public ResponseEntity<String> borrarEquipo(@PathVariable int id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -127,7 +124,6 @@ public class EquipoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
     @PostMapping("/{id}/add_member")
     public ResponseEntity<String> añadirMiembros(@PathVariable int id, @RequestBody Map<String, List<Integer>> body) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -146,7 +142,6 @@ public class EquipoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('PROFESOR') or hasAuthority('ESTUDIANTE')")
     @DeleteMapping("/{id}/borrar_miembros")
     public ResponseEntity<String> borrarMiembros(@PathVariable int id, @RequestBody Map<String, List<Integer>> body) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -164,9 +159,5 @@ public class EquipoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al eliminar los miembros del equipo.");
         }
     }
-
-
-
-
 
 }

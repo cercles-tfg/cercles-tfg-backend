@@ -204,6 +204,8 @@ public class UsuarioController {
                     ec.getCurso().getAñoInicio(),
                     ec.getCurso().getCuatrimestre(),
                     ec.getCurso().isActivo(),
+                    0,
+                    0,
                     0
             ))
                     .toList();

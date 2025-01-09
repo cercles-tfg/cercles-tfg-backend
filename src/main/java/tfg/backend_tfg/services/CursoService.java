@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Cell;
@@ -289,27 +290,49 @@ public class CursoService {
         }
     }
 
-    //obtener cursos de un profesor
+    // Obtener cursos de un profesor
     public List<CursoSummaryDTO> obtenerCursosProfesor(String profesorEmail) {
         Profesor profesor = (Profesor) usuarioRepository.findByCorreo(profesorEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Profesor no encontrado"));
 
+        // Obtener la lista de cursos del profesor
         List<ProfesorCurso> profesorCursos = profesorCursoRepository.findByProfesorId(profesor.getId());
+        
         return profesorCursos.stream()
                 .map(profesorCurso -> {
                     Curso curso = profesorCurso.getCurso();
+
+                    // Número de estudiantes en el curso
                     int numeroEstudiantes = estudianteCursoRepository.countByCursoId(curso.getId());
+                    
+                    // Número de equipos en el curso
+                    int numeroEquipos = equipoRepository.countByCursoId(curso.getId());
+                    
+                    // Estudiantes sin equipo
+                    List<EstudianteCurso> estudiantesCurso = estudianteCursoRepository.findByCursoId(curso.getId());
+                    List<Integer> estudiantesConEquipoIds = estudianteEquipoRepository.findByCursoId(curso.getId()).stream()
+                            .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getId())
+                            .toList();
+                    int numeroEstudiantesSinEquipo = (int) estudiantesCurso.stream()
+                            .map(EstudianteCurso::getEstudiante)
+                            .filter(estudiante -> !estudiantesConEquipoIds.contains(estudiante.getId()))
+                            .count();
+
+                    // Retornar el DTO con los datos calculados
                     return new CursoSummaryDTO(
                             curso.getId(),
                             curso.getNombreAsignatura(),
                             curso.getAñoInicio(),
                             curso.getCuatrimestre(),
                             curso.isActivo(),
-                            numeroEstudiantes
+                            numeroEstudiantes,
+                            numeroEquipos,
+                            numeroEstudiantesSinEquipo
                     );
                 })
                 .toList();
     }
+
 
     // Obtener detalle de un curso
     public CursoDetalleDTO obtenerDetalleCurso(Integer cursoId, String profesorEmail) {
@@ -335,22 +358,35 @@ public class CursoService {
 
         // Estudiantes sin grupo
         List<EstudianteDTO> estudiantesSinGrupo = estudiantesCurso.stream()
-                .map(EstudianteCurso::getEstudiante)
-                .filter(estudiante -> !estudiantesConEquipoIds.contains(estudiante.getId()))
-                .map(estudiante -> new EstudianteDTO(estudiante.getId(), estudiante.getNombre(), estudiante.getCorreo()))
-                .toList();
+        .filter(estudianteCurso -> !estudiantesConEquipoIds.contains(estudianteCurso.getEstudiante().getId()))
+        .map(estudianteCurso -> new EstudianteDTO(
+                estudianteCurso.getEstudiante().getId(),
+                estudianteCurso.getEstudiante().getNombre(),
+                estudianteCurso.getEstudiante().getCorreo(),
+                Optional.ofNullable(estudianteCurso.getGrupo())
+                            .orElse("N/A")
+        ))
+        .toList();
 
         // Equipos con miembros
         List<EquipoDTO> equiposConMiembros = equipoRepository.findByCursoId(cursoId).stream()
-                .map(equipo -> new EquipoDTO(
-                        equipo.getNombre(),
-                        equipo.getId(),
-                        equipo.getEvaluador() != null ? equipo.getEvaluador().getId() : null,
-                        estudianteEquipoRepository.findByEquipoId(equipo.getId()).stream()
-                                .map(estudianteEquipo -> estudianteEquipo.getEstudiante().getNombre())
-                                .toList()
-                ))
-                .toList();
+        .map(equipo -> new EquipoDTO(
+                equipo.getNombre(),
+                equipo.getId(),
+                equipo.getEvaluador() != null ? equipo.getEvaluador().getId() : null,
+                equipo.getGitOrganizacion() != null,
+                estudianteEquipoRepository.findByEquipoId(equipo.getId()).stream()
+                        .collect(Collectors.toMap(
+                                estudianteEquipo -> estudianteEquipo.getEstudiante().getNombre(),
+                                estudianteEquipo -> estudiantesCurso.stream()
+                                        .filter(ec -> ec.getEstudiante().getId() == estudianteEquipo.getEstudiante().getId())
+                                        .findFirst()
+                                        .map(EstudianteCurso::getGrupo)
+                                        .orElse("N/A")
+                        ))
+        ))
+        .toList();
+
 
         // Nombres de los profesores
         List<String> nombresProfesores = profesorCursoRepository.findByCursoId(cursoId).stream()
@@ -366,6 +402,7 @@ public class CursoService {
                 curso.isActivo(),
                 estudiantesSinGrupo.stream().map(EstudianteDTO::getNombre).toList(),
                 estudiantesSinGrupo.stream().map(EstudianteDTO::getCorreo).toList(),
+                estudiantesSinGrupo.stream().map(EstudianteDTO::getGrupo).toList(),
                 nombresProfesores,
                 equiposConMiembros
         );
@@ -520,7 +557,7 @@ public class CursoService {
             String nombre = ec.getEstudiante().getNombre();
             String correo = ec.getEstudiante().getCorreo();
     
-            EstudianteDTO estudianteDTO = new EstudianteDTO(estudianteId, nombre, correo);
+            EstudianteDTO estudianteDTO = new EstudianteDTO(estudianteId, nombre, correo, null);
     
             if (tieneEquipo) {
                 estudiantesConEquipo.add(estudianteDTO);
@@ -546,7 +583,8 @@ public class CursoService {
                     return new EstudianteDTO(
                             profesor.getId(),
                             profesor.getNombre(),
-                            profesor.getCorreo()
+                            profesor.getCorreo(),
+                            null
                     );
                 })
                 .toList();

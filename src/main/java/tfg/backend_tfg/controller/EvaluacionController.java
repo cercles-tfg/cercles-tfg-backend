@@ -46,6 +46,7 @@ public class EvaluacionController {
             @PathVariable Integer equipoId,
             @RequestParam(required = false) List<Integer> evaluacionIds) {
 
+        System.out.println("oki " + evaluacionIds);
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
@@ -99,5 +100,21 @@ public class EvaluacionController {
         evaluacionService.crearEvaluacionDetalle(request.getEvaluacionId(), request.getEvaluadorId(), request.getDetalles());
         return ResponseEntity.ok("Evaluación guardada correctamente");
     }
+
+    @GetMapping("/count/{cursoId}")
+    public ResponseEntity<?> contarEvaluacionesPorCurso(@PathVariable Integer cursoId) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+            }
+            List<Integer> evaluacionesIds = evaluacionService.obtenerIdsEvaluacionesPorCurso(cursoId);
+            return ResponseEntity.ok(Map.of("idsEvaluaciones", evaluacionesIds));
+        
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Error al contar las evaluaciones"));
+        }
+    }
+
 
 }

@@ -33,16 +33,10 @@ public class Equipo {
     @Column(name = "taiga_proyecto")
     private String taigaProyecto;
 
-    @Column(name = "git_org_id")
-    private String gitOrganizacionId;
-
     @Column(name = "taiga_project_id")
     private String taigaProyectoId;
 
     @Column(name = "taiga_refresh_token")
     private String taigaRefreshToken;
-
-    @Column(nullable = false)
-    private boolean validado;
 
 }

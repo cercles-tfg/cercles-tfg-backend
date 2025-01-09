@@ -235,15 +235,8 @@ public class EvaluacionService {
     }
     
 
-    
-
-
-    public List<Evaluacion> obtenerEvaluacionesPorCurso(Integer cursoId) {
-        return evaluacionRepository.findByCursoId(cursoId);
-    }
-
-    public List<EvaluacionDetalle> obtenerDetallesPorEvaluacion(Integer evaluacionId) {
-        return detalleRepository.findByEvaluacionId(evaluacionId);
+    public List<Integer> obtenerIdsEvaluacionesPorCurso(Integer cursoId) {
+        return evaluacionRepository.findIdsByCursoId(cursoId);
     }
 
 

@@ -62,6 +62,11 @@ public class GitHubController {
     @PostMapping("/confirmar-organizacion")
     public ResponseEntity<?> confirmarOrganizacion(@RequestBody Map<String, Object> request) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
+
             Integer equipoId = (Integer) request.get("equipoId");
             String organizacionUrl = (String) request.get("organizacionUrl");
 
@@ -73,6 +78,27 @@ public class GitHubController {
         }
     }
 
+    @DeleteMapping("/disconnect-organizacion")
+    public ResponseEntity<?> desconectarOrganizacion(@RequestBody Map<String, Object> request) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
+
+            Integer equipoId = (Integer) request.get("equipoId");
+
+            boolean desconectado = githubService.desconectarOrganizacion(equipoId);
+
+            if (desconectado) {
+                return ResponseEntity.ok(Map.of("mensaje", "Organización desconectada correctamente."));
+            } else {
+                return ResponseEntity.status(404).body(Map.of("error", "Equipo no encontrado."));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
+        }
+    }
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @GetMapping("/metrics/{organizacion}")
@@ -102,7 +128,6 @@ public class GitHubController {
                     .body(Map.of("error", e.getMessage()));
         }
     }
-
 
     
     @PostMapping("/callback")

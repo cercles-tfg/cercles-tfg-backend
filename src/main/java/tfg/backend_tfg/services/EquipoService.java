@@ -22,6 +22,7 @@ import tfg.backend_tfg.model.EstudianteEquipo;
 import tfg.backend_tfg.model.EstudianteEquipoId;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.ProfesorCurso;
+import tfg.backend_tfg.model.ProfesorCursoId;
 import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
@@ -61,9 +62,11 @@ public class EquipoService {
     public void validarEstudianteCurso(int estudianteId, int cursoId) {
         // Crear la clave compuesta
         EstudianteCursoId id = new EstudianteCursoId(estudianteId, cursoId);
+        //buscar en caso de que sea profesor
+        ProfesorCursoId id2 = new ProfesorCursoId(estudianteId, cursoId);
     
         // Verificar si existe la relación entre estudiante y curso
-        boolean perteneceAlCurso = estudianteCursoRepository.existsById(id);
+        boolean perteneceAlCurso = estudianteCursoRepository.existsById(id) || profesorCursoRepository.existsById(id2);
     
         if (!perteneceAlCurso) {
             throw new IllegalArgumentException("El estudiante no pertenece al curso especificado.");
@@ -138,7 +141,8 @@ public class EquipoService {
             return new EstudianteDTO(
                     estudiante.getId(),
                     estudiante.getNombre(),
-                    estudiante.getCorreo()
+                    estudiante.getCorreo(),
+                    null
             );
         })
         .collect(Collectors.toList());
@@ -197,7 +201,6 @@ public class EquipoService {
         equipo.setNombre(nombre);
         equipo.setCurso(curso);
         equipo.setEvaluador(profesorEvaluador);
-        equipo.setValidado(false);
         equipo = equipoRepository.save(equipo);
     
         // Validar y asociar los estudiantes al equipo

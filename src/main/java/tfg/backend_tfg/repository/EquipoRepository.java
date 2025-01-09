@@ -22,5 +22,7 @@ public interface EquipoRepository extends JpaRepository<Equipo, Integer> {
 
     List<Equipo> findByEvaluadorId(int evaluadorId);
 
+    int countByCursoId(Integer cursoId);
+
 }
 

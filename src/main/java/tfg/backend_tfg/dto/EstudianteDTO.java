@@ -4,12 +4,14 @@ public class EstudianteDTO {
     private int id;
     private String nombre;
     private String correo;
+    private String grupo;
 
     // Constructor
-    public EstudianteDTO(int id, String nombre, String correo) {
+    public EstudianteDTO(int id, String nombre, String correo, String grupo) {
         this.id = id;
         this.nombre = nombre;
         this.correo = correo;
+        this.grupo = grupo;
     }
 
     public int getId() {
@@ -35,4 +37,13 @@ public class EstudianteDTO {
     public void setCorreo(String correo) {
         this.correo = correo;
     }
+
+    public String getGrupo() {
+        return grupo;
+    }
+
+    public void setGrupo(String grupo) {
+        this.grupo = grupo;
+    }
+
 }

@@ -29,6 +29,7 @@ import tfg.backend_tfg.model.CursoRequest;
 import tfg.backend_tfg.model.Usuario;
 import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.CursoService;
 import tfg.backend_tfg.services.EquipoService;
@@ -45,6 +46,9 @@ public class CursoController {
 
     @Autowired
     private EstudianteCursoRepository estudianteCursoRepository;
+
+    @Autowired
+    private ProfesorCursoRepository profesorCursoRepository;
 
     @Autowired
     private EquipoService equipoService;
@@ -119,8 +123,9 @@ public class CursoController {
         }
     }
 
+   
+    @PreAuthorize("hasAuthority('PROFESOR')") 
     @GetMapping
-    @PreAuthorize("hasAuthority('PROFESOR')")
     public ResponseEntity<?> obtenerCursosProfesor() {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -158,8 +163,6 @@ public class CursoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al obtener los detalles del curso.");
         }
     }
-
-
 
 
     @PreAuthorize("hasAuthority('PROFESOR')")
@@ -217,8 +220,6 @@ public class CursoController {
     }
 
 
-
-    @PreAuthorize("hasAuthority('ESTUDIANTE') or hasAuthority('PROFESOR')")
     @GetMapping("/{cursoId}/equipos")
     public ResponseEntity<List<EquipoSummaryDTO>> obtenerEquiposPorCurso(@PathVariable int cursoId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -238,7 +239,6 @@ public class CursoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @GetMapping("/{id}/estudiantes") 
     public ResponseEntity<Map<String, List<EstudianteDTO>>> obtenerEstudiantesPorCurso(@PathVariable int id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -253,7 +253,7 @@ public class CursoController {
 
         // Verificar que el usuario autenticado es parte del curso
         boolean estaEnCurso = estudianteCursoRepository.findByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id)
-                .isPresent();
+                .isPresent() || profesorCursoRepository.findByProfesorIdAndCursoId(usuarioAutenticado.getId(), id).isPresent();
         if (!estaEnCurso) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }
@@ -267,7 +267,6 @@ public class CursoController {
         }
     }
 
-    @PreAuthorize("hasAuthority('ESTUDIANTE')")
     @GetMapping("/{id}/profesores")
     public ResponseEntity<List<EstudianteDTO>> obtenerProfesoresDelCurso(@PathVariable int id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -281,7 +280,8 @@ public class CursoController {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
 
         // Comprobar que el usuario es estudiante del curso
-        boolean esEstudianteDelCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id);
+        boolean esEstudianteDelCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id) 
+            || profesorCursoRepository.findByProfesorIdAndCursoId(usuarioAutenticado.getId(), id).isPresent();
         if (!esEstudianteDelCurso) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }

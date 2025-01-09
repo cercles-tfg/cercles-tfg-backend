@@ -172,6 +172,19 @@ public class GithubService {
         equipoRepository.save(equipo);
     }
 
+    //5. desconectar organizacion
+    public boolean desconectarOrganizacion(Integer equipoId) {
+        Optional<Equipo> equipoOpt = equipoRepository.findById(equipoId);
+        if (equipoOpt.isPresent()) {
+            Equipo equipo = equipoOpt.get();
+            equipo.setGitOrganizacion(null);
+            equipoRepository.save(equipo);
+            return true;
+        }
+        return false;
+    }
+    
+
     // 5. Obtener repositorios de la organización
     public List<String> obtenerRepositorios(String organizacion, String accessToken) {
         String url = "https://api.github.com/orgs/" + organizacion + "/repos";

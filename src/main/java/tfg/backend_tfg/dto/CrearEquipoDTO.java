@@ -9,6 +9,13 @@ public class CrearEquipoDTO {
     private int evaluadorId;
     private List<Integer> estudiantesIds;
 
+    public CrearEquipoDTO(String nombre, int cursoId, int evaluadorId, List<Integer> estudiantesIds) {
+        this.nombre = nombre;
+        this.cursoId = cursoId;
+        this.evaluadorId = evaluadorId;
+        this.estudiantesIds = estudiantesIds; 
+    }
+
     public String getNombre() {
         return nombre;
     }

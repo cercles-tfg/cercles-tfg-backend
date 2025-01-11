@@ -84,9 +84,9 @@ public class EvaluacionController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
     }
 
-    @GetMapping("/equipo/{equipoId}/evaluacion-realizada/{estudianteId}")
-    public ResponseEntity<Boolean> isEvaluacionRealizada(@PathVariable Integer equipoId, @PathVariable Integer estudianteId) {
-        boolean realizada = evaluacionDetalleRepository.existsByEquipoIdAndEvaluadorId(equipoId, estudianteId);
+    @GetMapping("/equipo/evaluacion-realizada/{evaluacionId}/{estudianteId}")
+    public ResponseEntity<Boolean> isEvaluacionRealizada(@PathVariable Integer estudianteId, @PathVariable Integer evaluacionId) {
+        boolean realizada = evaluacionDetalleRepository.existsByEvaluacionIdAndEvaluadorId(evaluacionId, estudianteId);
         return ResponseEntity.ok(realizada);
     }
 

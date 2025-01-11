@@ -9,5 +9,5 @@ public interface EvaluacionDetalleRepository extends JpaRepository<EvaluacionDet
     List<EvaluacionDetalle> findByEvaluacionId(Integer evaluacionId);
     List<EvaluacionDetalle> findByEquipoId(Integer equipoId);
     List<EvaluacionDetalle> findByEquipoIdAndEvaluacionIdIn(Integer equipoId, List<Integer> evaluacionIds);
-    boolean existsByEquipoIdAndEvaluadorId(Integer equipoId, Integer evaluadorId);
+    boolean existsByEvaluacionIdAndEvaluadorId(Integer evaluacionId, Integer evaluadorId);
 }

@@ -9,7 +9,6 @@ import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.UsuarioRepository;
 
 import java.util.List;
@@ -46,27 +45,27 @@ public class UsuarioService {
         return usuarioRepository.findByCorreo(correo) != null;
     }
 
-    public ResponseEntity<?> crearUsuario(UsuarioRequest usuarioRequest) {
+    public ResponseEntity<?> crearUsuario(String nombre, String correo, Rol rol) {
         try {
             // Verificar si ya existe un usuario con el correo dado
-            Optional<Usuario> usuarioExistente = usuarioRepository.findByCorreo(usuarioRequest.getCorreo());
+            Optional<Usuario> usuarioExistente = usuarioRepository.findByCorreo(correo);
 
             if (usuarioExistente.isPresent()) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("Usuario con el correo ya existe");
             }
 
             Usuario usuario;
-            if (usuarioRequest.getRol() == Rol.Estudiante) {
+            if (rol == Rol.Estudiante) {
                 usuario = Estudiante.builder()
-                        .correo(usuarioRequest.getCorreo())
-                        .nombre(usuarioRequest.getNombre())
-                        .rol(Rol.Estudiante)
+                        .correo(correo)
+                        .nombre(nombre)
+                        .rol(rol)
                         .build();
-            } else if (usuarioRequest.getRol() == Rol.Profesor) {
+            } else if (rol == Rol.Profesor) {
                 usuario = Profesor.builder()
-                        .correo(usuarioRequest.getCorreo())
-                        .nombre(usuarioRequest.getNombre())
-                        .rol(Rol.Profesor)
+                        .correo(correo)
+                        .nombre(nombre)
+                        .rol(rol)
                         .build();
             } else {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Rol inválido");
@@ -74,7 +73,7 @@ public class UsuarioService {
 
             // Guardar el nuevo usuario en la base de datos
             usuarioRepository.save(usuario);
-            return ResponseEntity.status(HttpStatus.CREATED).body("Usuario creado exitosamente");
+            return ResponseEntity.status(HttpStatus.CREATED).body(usuario);
 
         } catch (Exception e) {
             e.printStackTrace();

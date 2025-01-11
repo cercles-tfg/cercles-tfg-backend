@@ -9,11 +9,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -27,7 +27,6 @@ import tfg.backend_tfg.dto.EquipoDTO;
 import tfg.backend_tfg.dto.EstudianteDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
-import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.EstudianteRequest;
@@ -38,7 +37,6 @@ import tfg.backend_tfg.model.ProfesorCurso;
 import tfg.backend_tfg.model.ProfesorRequest;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.CursoRepository;
 import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
@@ -111,19 +109,19 @@ public class CursoService {
             
                     // Validar que no hay datos incompletos
                     if (grupo == null || cognomsNom == null || correo == null) {
-                        errores.add("Fila " + (i + 1) + ": Faltan datos obligatorios (grupo, nombre o correo).");
+                        errores.add("Fila " + (i + 1) + ": Manquen dades obligatòries (grup, nom o correu).");
                         continue;
                     }
             
                     // Validar el formato del correo electrónico
                     if (!correo.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                        errores.add("Fila " + (i + 1) + ": Correo electrónico con formato incorrecto.");
+                        errores.add("Fila " + (i + 1) + ": Correu electrònic amb format incorrecte.");
                         continue;
                     }
             
                     // Validar duplicados por correo electrónico
                     if (correosExistentes.contains(correo)) {
-                        errores.add("Fila " + (i + 1) + ": Correo duplicado (" + correo + ").");
+                        errores.add("Fila " + (i + 1) + ": Correu duplicat (" + correo + ").");
                         continue;
                     }
             
@@ -132,7 +130,7 @@ public class CursoService {
                     // Separar apellidos y nombre
                     String[] partes = cognomsNom.split(",");
                     if (partes.length < 2) {
-                        errores.add("Fila " + (i + 1) + ": Formato incorrecto en el nombre y apellidos.");
+                        errores.add("Fila " + (i + 1) + ": Format incorrecte en el nom i cognoms.");
                         continue;
                     }
             
@@ -153,7 +151,7 @@ public class CursoService {
             // Si hay errores, devolverlos en la respuesta
             if (!errores.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Se encontraron errores en el archivo.",
+                    "message", "S'han trobat errors en l'arxiu.",
                     "errores", errores
                 ));
             }
@@ -206,7 +204,11 @@ public class CursoService {
                 return responseEvaluaciones;
             }
 
-            return ResponseEntity.status(HttpStatus.CREATED).body("Curso creado exitosamente");
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Curso creado exitosamente");
+            response.put("cursoId", curso.getId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al crear el curso: " + e.getMessage());
@@ -438,19 +440,15 @@ public class CursoService {
             Usuario usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
             if (usuarioExistente == null) {
                 // Llamar al servicio para crear el usuario si todavia no existe
-                UsuarioRequest usuarioRequest = new UsuarioRequest();
-                usuarioRequest.setCorreo(estudianteRequest.getCorreo());
-                usuarioRequest.setNombre(estudianteRequest.getNombre());
-                usuarioRequest.setRol(Rol.Estudiante);
+                ResponseEntity<?> response = usuarioService.crearUsuario(estudianteRequest.getNombre(), estudianteRequest.getCorreo(), Rol.Estudiante);
 
-                ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
-
-                if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
+                if (response.getStatusCode().equals(HttpStatus.CREATED)) {
+                    usuarioExistente = (Usuario) response.getBody();
+                } else {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body("Error al crear el estudiante: " + estudianteRequest.getCorreo());
                 }
 
-                usuarioExistente = usuarioRepository.findByCorreo(estudianteRequest.getCorreo()).orElse(null);
             }
             // Asociar al estudiante con el curso
             EstudianteCurso estudianteCurso = new EstudianteCurso((Estudiante) usuarioExistente, cursoExistente, estudianteRequest.getGrupo());
@@ -489,27 +487,20 @@ public class CursoService {
             
             if (usuarioExistente == null) {
                 // Crear un nuevo profesor si no existe
-                UsuarioRequest usuarioRequest = new UsuarioRequest();
-                usuarioRequest.setCorreo(profesorRequest.getCorreo());
-                usuarioRequest.setNombre(profesorRequest.getNombre());
-                usuarioRequest.setRol(Rol.Profesor);
+                ResponseEntity<?> response = usuarioService.crearUsuario(profesorRequest.getNombre(), profesorRequest.getCorreo(), Rol.Profesor);
 
-                ResponseEntity<?> response = usuarioService.crearUsuario(usuarioRequest);
-                if (!response.getStatusCode().equals(HttpStatus.CREATED)) {
+                if (response.getStatusCode().equals(HttpStatus.CREATED)) {
+                    usuarioExistente = (Usuario) response.getBody();
+                } else {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body("Error al crear el profesor: " + profesorRequest.getCorreo());
                 }
-
-                usuarioExistente = usuarioRepository.findByCorreo(profesorRequest.getCorreo()).orElse(null);
             }
 
-            // Crear la relación ProfesorCurso si no existe
-            Profesor profesor = (Profesor) usuarioExistente;
-            Optional<ProfesorCurso> profesorCursoOpt = profesorCursoRepository.findByProfesorIdAndCursoId(profesor.getId(), cursoExistente.getId());
-            if (profesorCursoOpt.isEmpty()) {
-                ProfesorCurso profesorCurso = new ProfesorCurso(profesor, cursoExistente);
-                profesorCursoRepository.save(profesorCurso);
-            }
+            // Crear la relación ProfesorCurso
+            ProfesorCurso profesorCurso = new ProfesorCurso((Profesor) usuarioExistente, cursoExistente);
+            profesorCursoRepository.save(profesorCurso);
+        
         }
         return ResponseEntity.ok().build();
     }

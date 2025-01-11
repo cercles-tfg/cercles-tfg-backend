@@ -17,7 +17,6 @@ import tfg.backend_tfg.model.EstudianteCurso;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.model.UsuarioRequest;
 import tfg.backend_tfg.repository.EstudianteCursoRepository;
 import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
@@ -67,15 +66,17 @@ public class UsuarioController {
 
     @PreAuthorize("hasAuthority('profesor')")
     @PostMapping("/crear")
-    public ResponseEntity<?> crearUsuario(@RequestBody UsuarioRequest usuarioRequest) {
+    public ResponseEntity<?> crearUsuario(@RequestBody Map<String, Object> requestBody) {
         // Verificar autenticación del usuario
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Usuario no autenticado.");
         }
-        
+        String nombre = (String) requestBody.get("nombre");
+        String correo = (String) requestBody.get("correo");
+        Rol rol = Rol.valueOf((String) requestBody.get("rol"));
         // Llamar al servicio para crear el usuario
-        return usuarioService.crearUsuario(usuarioRequest);
+        return usuarioService.crearUsuario(nombre, correo, rol);
     }
 
     @GetMapping("/profesores")

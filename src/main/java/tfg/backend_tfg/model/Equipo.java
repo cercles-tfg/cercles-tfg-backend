@@ -12,6 +12,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Table(name = "equipo")
 public class Equipo {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;

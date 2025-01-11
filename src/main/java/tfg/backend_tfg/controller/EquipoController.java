@@ -72,7 +72,7 @@ public class EquipoController {
                 .getId();
 
         try {
-            // Validar que el estudiante pertenece al curso
+            // Validar que el estudiante o el profesor pertenece al curso
             equipoService.validarEstudianteCurso(estudianteId, crearEquipoDTO.getCursoId());
 
             // Crear el equipo

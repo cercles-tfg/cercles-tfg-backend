@@ -8,6 +8,8 @@ public class CursoRequest {
     private int añoInicio;
     private int cuatrimestre;
     private boolean activo;
+    private String githubAsignatura;
+    private String tokenGithubAsignatura;
     private List<EstudianteRequest> estudiantes;
     private List<ProfesorRequest> profesores;
 
@@ -54,6 +56,22 @@ public class CursoRequest {
 
     public void setActivo(boolean activo) {
         this.activo = activo;
+    }
+
+    public String getGithubAsignatura () {
+        return githubAsignatura;
+    }
+
+    public void setGithubAsignatura(String githubAsignatura) {
+        this.githubAsignatura = githubAsignatura;
+    } 
+    
+    public String getTokenGithubAsignatura() {
+        return tokenGithubAsignatura;
+    }
+
+    public void setTokenGithubAsignatura(String tokenGithubAsignatura) {
+        this.tokenGithubAsignatura = tokenGithubAsignatura;
     }
 
     public List<EstudianteRequest> getEstudiantes() {

@@ -11,8 +11,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import tfg.backend_tfg.dto.MetricasUsuarioDTO;
+import tfg.backend_tfg.model.Equipo;
 import tfg.backend_tfg.model.Estudiante;
+import tfg.backend_tfg.repository.EquipoRepository;
 import tfg.backend_tfg.repository.EstudianteRepository;
+import tfg.backend_tfg.security.TokenEncrypter;
 import tfg.backend_tfg.services.GithubService;
 
 import java.util.List;
@@ -26,12 +29,17 @@ public class GitHubController {
     private final GithubService githubService;
     @Autowired
     private final EstudianteRepository estudianteRepository;
-    @Value("${professorat-amep.token}")
-    private String profAmepToken;
+    @Autowired
+    private final EquipoRepository equipoRepository;
+    private final TokenEncrypter tokenEncrypter;
+
+
     
-    public GitHubController(GithubService githubService, EstudianteRepository estudianteRepository) {
+    public GitHubController(GithubService githubService, EstudianteRepository estudianteRepository, EquipoRepository equipoRepository, TokenEncrypter tokenEncrypter) {
         this.githubService = githubService;
         this.estudianteRepository = estudianteRepository;
+        this.equipoRepository = equipoRepository;
+        this.tokenEncrypter = tokenEncrypter;
     }
 
     @PostMapping("/validar-organizacion")
@@ -45,8 +53,10 @@ public class GitHubController {
             String organizacionUrl = (String) request.get("organizacionUrl");
             List<Integer> miembrosIds = (List<Integer>) request.get("miembrosIds");
             Integer profesorId = Integer.valueOf(request.get("profesorId").toString());
+            String githubAsignatura = (String) request.get("githubAsignatura");
+            String tokenGithub = (String) request.get("tokenGithub");
 
-            Map<String, Boolean> resultado = githubService.validarOrganizacion(profesorId, miembrosIds, organizacionUrl);
+            Map<String, Boolean> resultado = githubService.validarOrganizacion(profesorId, miembrosIds, organizacionUrl, githubAsignatura, tokenGithub);
 
             return ResponseEntity.ok(resultado);
         } catch (HttpClientErrorException e) {
@@ -101,8 +111,8 @@ public class GitHubController {
     }
 
     @PreAuthorize("hasAuthority('PROFESOR')")
-    @GetMapping("/metrics/{organizacion}")
-    public ResponseEntity<?> obtenerMetricas(@PathVariable String organizacion, @RequestParam List<Integer> estudiantesIds) {
+    @GetMapping("/equipo/{idEquipo}/metrics/{organizacion}")
+    public ResponseEntity<?> obtenerMetricas(@PathVariable String organizacion, @RequestParam List<Integer> estudiantesIds, @PathVariable Integer idEquipo) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -116,9 +126,20 @@ public class GitHubController {
                     .filter(username -> username != null && !username.isEmpty())
                     .collect(Collectors.toList());
 
+
+            String tokenGithub = equipoRepository.findByEquipoId(idEquipo).getTokenGithubAsignatura();
+
+            String tokenDescifrado = null;
+            try {
+                if (tokenGithub != null) {
+                    tokenDescifrado = tokenEncrypter.decrypt(tokenGithub);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error al descifrar el token del curso.", e);
+            }
             // Llamada al servicio con el token personal
             Map<String, Object> metricasOrganizacion = githubService.obtenerMetricasOrganizacion(
-                    organizacion, usuarios, profAmepToken, estudiantesIds
+                    organizacion, usuarios, tokenDescifrado, estudiantesIds
             );
 
             return ResponseEntity.ok(metricasOrganizacion);

@@ -44,6 +44,7 @@ import tfg.backend_tfg.repository.EstudianteEquipoRepository;
 import tfg.backend_tfg.repository.EvaluacionRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.security.TokenEncrypter;
 
 @Service
 public class CursoService {
@@ -69,6 +70,12 @@ public class CursoService {
 
     @Autowired
     private EvaluacionRepository evaluacionRepository;
+
+    private final TokenEncrypter tokenEncrypter;
+    @Autowired
+    public CursoService(TokenEncrypter tokenEncrypter) {
+        this.tokenEncrypter = tokenEncrypter;
+    }
 
     //Leer estudiantes del excel con validaciones
     public ResponseEntity<?> uploadEstudiantes(MultipartFile file) {
@@ -176,12 +183,21 @@ public class CursoService {
                         .body("Curso activo ya existente. ¿Desea desactivarlo?");
             }
 
+            String encryptedToken = null;
+            if (cursoRequest.getTokenGithubAsignatura() != null && !cursoRequest.getTokenGithubAsignatura().isEmpty()) {
+                encryptedToken = tokenEncrypter.encrypt(cursoRequest.getTokenGithubAsignatura());
+            }
+
+            System.out.println("git " + cursoRequest.getGithubAsignatura());
+            System.out.println("token " + cursoRequest.getTokenGithubAsignatura());
             // Crear el curso
             Curso curso = Curso.builder()
                     .nombreAsignatura(cursoRequest.getNombreAsignatura())
                     .añoInicio(cursoRequest.getAñoInicio())
                     .cuatrimestre(cursoRequest.getCuatrimestre())
                     .activo(cursoRequest.isActivo())
+                    .githubAsignatura(cursoRequest.getGithubAsignatura())
+                    .tokenGithubAsignatura(encryptedToken)
                     .build();
 
             curso = cursoRepository.save(curso);
@@ -402,6 +418,8 @@ public class CursoService {
                 curso.getAñoInicio(),
                 curso.getCuatrimestre(),
                 curso.isActivo(),
+                curso.getGithubAsignatura(),
+                curso.getTokenGithubAsignatura(),
                 estudiantesSinGrupo.stream().map(EstudianteDTO::getNombre).toList(),
                 estudiantesSinGrupo.stream().map(EstudianteDTO::getCorreo).toList(),
                 estudiantesSinGrupo.stream().map(EstudianteDTO::getGrupo).toList(),
@@ -412,7 +430,7 @@ public class CursoService {
 
 
     //Modificar datos basicos curso
-    public ResponseEntity<?> modificarDatosCurso(Curso cursoExistente, CursoRequest cursoRequest) {
+    public ResponseEntity<?> modificarDatosCurso(Curso cursoExistente, CursoRequest cursoRequest) throws Exception {
         if (!cursoExistente.getNombreAsignatura().equals(cursoRequest.getNombreAsignatura()) ||
             cursoExistente.getAñoInicio() != cursoRequest.getAñoInicio() ||
             cursoExistente.getCuatrimestre() != cursoRequest.getCuatrimestre()) {
@@ -430,6 +448,13 @@ public class CursoService {
         cursoExistente.setNombreAsignatura(cursoRequest.getNombreAsignatura());
         cursoExistente.setAñoInicio(cursoRequest.getAñoInicio());
         cursoExistente.setCuatrimestre(cursoRequest.getCuatrimestre());
+        cursoExistente.setGithubAsignatura(cursoRequest.getGithubAsignatura());
+
+        String encryptedToken = null;
+            if (cursoRequest.getTokenGithubAsignatura() != null && !cursoRequest.getTokenGithubAsignatura().isEmpty()) {
+                encryptedToken = tokenEncrypter.encrypt(cursoRequest.getTokenGithubAsignatura());
+            }
+        cursoExistente.setTokenGithubAsignatura(encryptedToken);
     
         return ResponseEntity.ok().build();
     }

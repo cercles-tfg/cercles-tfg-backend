@@ -31,6 +31,7 @@ import tfg.backend_tfg.repository.EstudianteRepository;
 import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.ProfesorRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
+import tfg.backend_tfg.security.TokenEncrypter;
 
 @Service
 public class EquipoService {
@@ -58,6 +59,14 @@ public class EquipoService {
 
     @Autowired
     private EstudianteCursoRepository estudianteCursoRepository;
+
+    private final TokenEncrypter tokenEncrypter;
+
+    @Autowired
+    public EquipoService(TokenEncrypter tokenEncrypter) {
+        this.tokenEncrypter = tokenEncrypter;
+    }
+
 
     public void validarEstudianteCurso(int estudianteId, int cursoId) {
         // Crear la clave compuesta
@@ -147,6 +156,14 @@ public class EquipoService {
         })
         .collect(Collectors.toList());
 
+        String tokenDescifrado = null;
+        try {
+            if (curso.getTokenGithubAsignatura() != null) {
+                tokenDescifrado = tokenEncrypter.decrypt(curso.getTokenGithubAsignatura());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error al descifrar el token del curso.", e);
+        }
 
         // Crear y devolver el DTO
         return new EquipoDetalleDTO(
@@ -157,6 +174,8 @@ public class EquipoService {
                 curso.getAñoInicio(),
                 curso.getCuatrimestre(),
                 curso.isActivo(),
+                curso.getGithubAsignatura(),
+                tokenDescifrado,
                 evaluadorId,
                 evaluadorNombre,
                 evaluadorCorreo,

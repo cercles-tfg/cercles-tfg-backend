@@ -46,9 +46,6 @@ public class GithubService {
     @Value("${github.client.secret}")
     private String clientSecret;
 
-    @Value("${professorat-amep.token}")
-    private String profAmepToken;
-
     @Autowired
     private RestTemplate restTemplate;
 
@@ -63,7 +60,7 @@ public class GithubService {
     //1-8 funciones datos de una org
 
     //1. validar la org de un equipo
-    public Map<String, Boolean> validarOrganizacion(Integer profesorId, List<Integer> miembrosIds, String organizacionUrl) {
+    public Map<String, Boolean> validarOrganizacion(Integer profesorId, List<Integer> miembrosIds, String organizacionUrl, String githubAsignatura, String tokenGithub) {
         String organizacion = organizacionUrl.replace("https://github.com/", "").replaceAll("/$", "");
 
         // Obtener git_username de los miembros
@@ -82,11 +79,11 @@ public class GithubService {
         resultadoValidacion.put("profesorGitConfigurado", profesorGitUsername != null);
 
         try {
-            // Verificar si 'professorat-amep' es miembro
-            boolean professoratMiembro = verificarMiembro(organizacion, "professorat-amep");
+            // Verificar si el github de la asignatura es miembro
+            boolean professoratMiembro = verificarMiembro(organizacion, githubAsignatura, tokenGithub);
             resultadoValidacion.put("professoratEsMiembro", professoratMiembro);
 
-            // Si 'professorat-amep' no es miembro, devolver todos los valores como false
+            // Si el github de la asignatura no es miembro, devolver todos los valores como false
             if (!professoratMiembro) {
                 resultadoValidacion.put("professoratEsAdmin", false);
                 resultadoValidacion.put("todosMiembrosEnOrganizacion", false);
@@ -94,8 +91,8 @@ public class GithubService {
                 return resultadoValidacion;
             }
 
-            // Verificar si 'professorat-amep' es admin
-            boolean professoratOwner = verificarOwner(organizacion, "professorat-amep");
+            // Verificar si el github de la asignatura es admin
+            boolean professoratOwner = verificarOwner(organizacion, githubAsignatura, tokenGithub);
             resultadoValidacion.put("professoratEsAdmin", professoratOwner);
 
             if (!professoratOwner) {
@@ -107,7 +104,7 @@ public class GithubService {
             // Obtener miembros de la organización
             String url = String.format("https://api.github.com/orgs/%s/members", organizacion);
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + profAmepToken);
+            headers.set("Authorization", "Bearer " + tokenGithub);
             headers.set("Accept", "application/vnd.github+json");
 
             HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -129,12 +126,12 @@ public class GithubService {
         return resultadoValidacion;
     }
 
-    //2 verificar si professorat-amep es miembro
-    private boolean verificarMiembro(String organizacion, String username) {
+    //2 verificar si el github de la asignatura es miembro
+    private boolean verificarMiembro(String organizacion, String username, String tokenGithub) {
         try {
             String url = String.format("https://api.github.com/orgs/%s/members/%s", organizacion, username);
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + profAmepToken);
+            headers.set("Authorization", "Bearer " + tokenGithub);
             headers.set("Accept", "application/vnd.github+json");
 
             HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -146,12 +143,12 @@ public class GithubService {
         }
     }
 
-    //3 verificar que professorat-amep es admin/owner
-    private boolean verificarOwner(String organizacion, String username) {
+    //3 verificar que el github de la asignatura es admin/owner
+    private boolean verificarOwner(String organizacion, String username, String tokenGithub) {
         try {
             String url = String.format("https://api.github.com/orgs/%s/memberships/%s", organizacion, username);
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + profAmepToken);
+            headers.set("Authorization", "Bearer " + tokenGithub);
             headers.set("Accept", "application/vnd.github+json");
 
             HttpEntity<?> entity = new HttpEntity<>(headers);

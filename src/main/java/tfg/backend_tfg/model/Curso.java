@@ -29,6 +29,12 @@ public class Curso {
     @Column(nullable = false)
     private boolean activo;
 
+    @Column(name = "github_asignatura", nullable = false)
+    private String githubAsignatura;
+
+    @Column(name = "token_github_asignatura", nullable = false)
+    private String tokenGithubAsignatura;
+
     // Relación con profesores a través de ProfesorCurso
     @OneToMany(mappedBy = "curso", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProfesorCurso> profesores;

@@ -141,44 +141,6 @@ public class GitHubController {
         }
     }
 
-    @PreAuthorize("hasAuthority('PROFESOR')")
-    @GetMapping("/equipo/{idEquipo}/lineas-commits/{organizacion}")
-    public ResponseEntity<?> obtenerLineasCommits(@PathVariable String organizacion, @RequestParam List<Integer> estudiantesIds, @PathVariable Integer idEquipo) {
-        try {
-            // Verificar autenticación
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
-            }
-
-            // Obtener usuarios GitHub de los estudiantes
-            List<String> usuarios = usuarioService.getAllUsuariosById(estudiantesIds);
-
-            // Obtener el token GitHub asociado al equipo
-            String tokenGithub = equipoService.getTokenEquipo(idEquipo);
-
-            String tokenDescifrado = null;
-            try {
-                if (tokenGithub != null) {
-                    tokenDescifrado = tokenEncrypter.decrypt(tokenGithub);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("Error al descifrar el token del curso.", e);
-            }
-
-            // Llamada al servicio para obtener líneas de commits
-            Map<String, Object> lineasCommitsOrganizacion = githubService.obtenerLineasDeCommitsPorOrganizacion(
-                    organizacion, usuarios, tokenDescifrado
-            );
-
-            return ResponseEntity.ok(lineasCommitsOrganizacion);
-        } catch (Exception e) {
-            e.printStackTrace(); // Log completo del error
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
     
     @PostMapping("/callback")
     public ResponseEntity<?> handleGitHubCallback(@RequestBody Map<String, String> requestBody) {

@@ -5,6 +5,8 @@ public class MetricasUsuarioDTO {
     private String nombre;
     private String username;
     private int totalCommits;
+    private int linesAdded;
+    private int linesRemoved;
     private int pullRequestsCreated;
     private int pullRequestsMerged;
 
@@ -31,6 +33,8 @@ public class MetricasUsuarioDTO {
     // Método para combinar métricas de otro DTO
     public void combine(MetricasUsuarioDTO other) {
         this.totalCommits += other.totalCommits;
+        this.linesAdded += other.linesAdded;
+        this.linesRemoved += other.linesRemoved;
         this.pullRequestsCreated += other.pullRequestsCreated;
         this.pullRequestsMerged += other.pullRequestsMerged;
         this.userStories += other.userStories;
@@ -44,6 +48,8 @@ public class MetricasUsuarioDTO {
         return "MetricasUsuarioDTO{" +
                 "username='" + username + '\'' +
                 ", totalCommits=" + totalCommits +
+                ", linesAdded=" + linesAdded +
+                ", linesRemoved=" + linesRemoved +
                 ", pullRequestsCreated=" + pullRequestsCreated +
                 ", pullRequestsMerged=" + pullRequestsMerged +
                 ", userStories=" + userStories +
@@ -77,6 +83,21 @@ public class MetricasUsuarioDTO {
         this.totalCommits = totalCommits;
     }
 
+    public int getLinesAdded() {
+        return linesAdded;
+    }
+
+    public void setLinesAdded(int linesAdded) {
+        this.linesAdded = linesAdded;
+    }
+
+    public int getLinesRemoved() {
+        return linesRemoved;
+    }
+
+    public void setLinesRemoved(int linesRemoved) {
+        this.linesRemoved = linesRemoved;
+    }
 
     public int getPullRequestsCreated() {
         return pullRequestsCreated;

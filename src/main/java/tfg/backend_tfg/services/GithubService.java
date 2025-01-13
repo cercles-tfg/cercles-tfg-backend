@@ -244,43 +244,38 @@ public class GithubService {
         List<String> globalIssueDetails = new ArrayList<>();
     
         try {
-            // Obtener commits con paginación
-            int page = 1;
-            boolean hasMore = true;
-            int totalComs = 0;
-            while (hasMore) {
-                String commitsUrl = commitsBaseUrl + "?per_page=100&page=" + page;
-                ResponseEntity<JsonNode> commitsResponse = restTemplate.exchange(commitsUrl, HttpMethod.GET, entity, JsonNode.class);
-                JsonNode commits = commitsResponse.getBody();
-    
-                if (commits == null || commits.isEmpty()) {
-                    hasMore = false;
-                } else {
-                    for (JsonNode commit : commits) {
-                        String author = commit.path("author").path("login").asText();
-                        if (metricsMap.containsKey(author)) {
-                            MetricasUsuarioDTO metrics = metricsMap.get(author);
-                            
+            // Obtener commits con GraphQL
+            List<JsonNode> commits = obtenerTodosCommitsGraphQL(organizacion, repo, accessToken);
 
-                            // Verificar si el commit corresponde a un "Merge pull request"
-                            String commitMessage = commit.path("commit").path("message").asText();
-                            if (commitMessage.startsWith("Merge pull request") || commitMessage.startsWith("Merge branch") || commitMessage.startsWith("Merge remote-tracking branch")) {
-                                metrics.setPullRequestsMerged(metrics.getPullRequestsMerged() + 1);
-                            } else {
-                                metrics.setTotalCommits(metrics.getTotalCommits() + 1);
-                            ++totalComs;
-                            }
+            if (commits.isEmpty()) {
+                System.out.println("No se encontraron commits para el repositorio: " + repo);
+            } else {
+                for (JsonNode commitNode : commits) {
+                    String author = commitNode.path("author").path("user").path("login").asText(null);
+                    String message = commitNode.path("message").asText("");
+                    int additions = commitNode.path("additions").asInt(0);
+                    int deletions = commitNode.path("deletions").asInt(0);
+
+                    if (author != null && metricsMap.containsKey(author)) {
+                        MetricasUsuarioDTO metrics = metricsMap.get(author);
+
+                        if (message.startsWith("Merge pull request") || message.startsWith("Merge branch") || message.startsWith("Merge remote-tracking branch")) {
+                            metrics.setPullRequestsMerged(metrics.getPullRequestsMerged() + 1);
+                        } else {
+                            metrics.setTotalCommits(metrics.getTotalCommits() + 1);
+                            metrics.setLinesAdded(metrics.getLinesAdded() + additions);
+                            metrics.setLinesRemoved(metrics.getLinesRemoved() + deletions);
                         }
+
+                        
                     }
-                    page++;
                 }
             }
-            System.out.println("total coms " + totalComs);
+
     
             // Obtener Pull Requests con paginación
-            page = 1;
-            hasMore = true;
-            int totalpulls = 0;
+            int page = 1;
+            boolean hasMore = true;
             while (hasMore) {
                 String pullsUrl = pullsBaseUrl + "?state=all&per_page=100&page=" + page;
                 ResponseEntity<JsonNode> pullsResponse = restTemplate.exchange(pullsUrl, HttpMethod.GET, entity, JsonNode.class);
@@ -294,13 +289,11 @@ public class GithubService {
                         if (metricsMap.containsKey(author)) {
                             MetricasUsuarioDTO metrics = metricsMap.get(author);
                             metrics.setPullRequestsCreated(metrics.getPullRequestsCreated() + 1);
-                            ++totalpulls;
                         }
                     }
                     page++;
                 }
             }
-            System.out.println("total pulls " + totalpulls);
     
             // Obtener Issues y Métricas Globales
             String issuesUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/issues?state=all&per_page=100";
@@ -308,7 +301,6 @@ public class GithubService {
     
             // Agregar detalles de issues al listado global
             globalIssueDetails.addAll((List<String>) repoGlobalMetrics.get("issueDetails"));
-            System.out.print("issues  " + repoGlobalMetrics);
     
         } catch (Exception e) {
             System.err.println("Error al obtener métricas del repositorio " + repo + ": " + e.getMessage());
@@ -319,6 +311,97 @@ public class GithubService {
         result.put("globalIssueDetails", globalIssueDetails);
     
         return result;
+    }
+
+    //obtener commits y lineaas utilizando graphql
+    public List<JsonNode> obtenerTodosCommitsGraphQL(String organizacion, String repo, String accessToken) {
+        String graphqlUrl = "https://api.github.com/graphql";
+    
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Content-Type", "application/json");
+    
+        String commitsQuery = """
+            query($owner: String!, $repo: String!, $first: Int!, $after: String) {
+              repository(owner: $owner, name: $repo) {
+                defaultBranchRef {
+                  target {
+                    ... on Commit {
+                      history(first: $first, after: $after) {
+                        pageInfo {
+                          hasNextPage
+                          endCursor
+                        }
+                        edges {
+                          node {
+                            message
+                            additions
+                            deletions
+                            author {
+                              user {
+                                login
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """;
+    
+        List<JsonNode> commits = new ArrayList<>();
+        String endCursor = null;
+        boolean hasNextPage = true;
+    
+        try {
+            while (hasNextPage) {
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("owner", organizacion);
+                variables.put("repo", repo);
+                variables.put("first", 100);
+                variables.put("after", endCursor);
+    
+                Map<String, Object> payload = Map.of("query", commitsQuery, "variables", variables);
+    
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+                ResponseEntity<JsonNode> response = restTemplate.postForEntity(graphqlUrl, entity, JsonNode.class);
+    
+                if (!response.getStatusCode().is2xxSuccessful()) {
+                    System.err.println("Error al obtener datos de GraphQL. Código de estado: " + response.getStatusCode());
+                    System.err.println("Respuesta: " + response.getBody());
+                    break;
+                }
+    
+                JsonNode body = response.getBody();
+    
+                JsonNode history = body.path("data")
+                        .path("repository")
+                        .path("defaultBranchRef")
+                        .path("target")
+                        .path("history");
+    
+                if (history.isMissingNode()) {
+                    System.err.println("No se encontró historial de commits en la respuesta para el repositorio: " + repo);
+                    System.err.println("Contenido del nodo 'repository': " + body.path("data").path("repository"));
+                    break;
+                }
+    
+                for (JsonNode commit : history.path("edges")) {
+                    commits.add(commit.path("node"));
+                }
+    
+                hasNextPage = history.path("pageInfo").path("hasNextPage").asBoolean();
+                endCursor = history.path("pageInfo").path("endCursor").asText(null);
+            }
+        } catch (Exception e) {
+            System.err.println("Excepción al obtener commits con GraphQL para el repositorio " + repo + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    
+        return commits;
     }
     
     
@@ -385,20 +468,16 @@ public class GithubService {
     //8. obtener metricas de una org
     public Map<String, Object> obtenerMetricasOrganizacion(String organizacion, List<String> usuarios, String accessToken, List<Integer> estudiantesIds) {
         List<String> repositorios = obtenerRepositorios(organizacion, accessToken);
-        System.out.println("Repositorios obtenidos: " + repositorios);
     
         // Filtrar repositorios no vacíos
         List<String> repositoriosNoVacios = repositorios.stream()
                 .filter(repo -> {
                     if (isRepositorioVacio(organizacion, repo, accessToken)) {
-                        System.out.println("Repositorio vacío omitido: " + repo);
                         return false; // Excluir repositorios vacíos
                     }
                     return true; // Incluir repositorios no vacíos
                 })
                 .collect(Collectors.toList());
-    
-        System.out.println("Repositorios no vacíos: " + repositoriosNoVacios);
     
         List<String> globalIssueDetails = new ArrayList<>();
         Map<String, String> usernameToNombre = estudianteRepository.findAllById(estudiantesIds)
@@ -441,91 +520,6 @@ public class GithubService {
     
         return result;
     }
-    
-    //9. obtener lineas de los commits por org
-    public Map<String, Object> obtenerLineasDeCommitsPorOrganizacion(String organizacion, List<String> usuarios, String accessToken) {
-        List<String> repositorios = obtenerRepositorios(organizacion, accessToken);
-        System.out.println("Repositorios obtenidos: " + repositorios);
-
-        // Filtrar repositorios no vacíos
-        List<String> repositoriosNoVacios = repositorios.stream()
-                .filter(repo -> !isRepositorioVacio(organizacion, repo, accessToken))
-                .collect(Collectors.toList());
-
-        System.out.println("Repositorios no vacíos: " + repositoriosNoVacios);
-
-        // Mapa para acumular las métricas por usuario
-        Map<String, MetricasLineasUsuarioDTO> aggregatedMetrics = new HashMap<>();
-        for (String usuario : usuarios) {
-            aggregatedMetrics.put(usuario, new MetricasLineasUsuarioDTO(usuario));
-        }
-
-        // Procesar repositorios en paralelo
-        List<CompletableFuture<Void>> futures = repositoriosNoVacios.stream()
-                .map(repo -> CompletableFuture.runAsync(() -> obtenerLineasDeCommitsPorRepositorio(organizacion, repo, usuarios, accessToken, aggregatedMetrics)))
-                .collect(Collectors.toList());
-
-        // Esperar a que se completen todas las tareas
-        futures.forEach(future -> {
-            try {
-                future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                System.err.println("Error procesando líneas de commits: " + e.getMessage());
-            }
-        });
-
-        // Crear el resultado final
-        Map<String, Object> result = new HashMap<>();
-        result.put("userMetrics", new ArrayList<>(aggregatedMetrics.values()));
-
-        return result;
-    }
-
-    
-
-    //10. obtener lineas commits por repo
-    private void obtenerLineasDeCommitsPorRepositorio(String organizacion, String repo, List<String> usuarios, String accessToken, Map<String, MetricasLineasUsuarioDTO> aggregatedMetrics) {
-        String commitsBaseUrl = "https://api.github.com/repos/" + organizacion + "/" + repo + "/commits";
-    
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
-        headers.set("Accept", "application/vnd.github+json");
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-    
-        try {
-            int page = 1;
-            boolean hasMore = true;
-    
-            while (hasMore) {
-                String commitsUrl = commitsBaseUrl + "?per_page=100&page=" + page;
-                ResponseEntity<JsonNode> commitsResponse = restTemplate.exchange(commitsUrl, HttpMethod.GET, entity, JsonNode.class);
-                JsonNode commits = commitsResponse.getBody();
-    
-                if (commits == null || commits.isEmpty()) {
-                    hasMore = false;
-                } else {
-                    for (JsonNode commit : commits) {
-                        String author = commit.path("author").path("login").asText();
-                        if (aggregatedMetrics.containsKey(author)) {
-                            MetricasLineasUsuarioDTO metrics = aggregatedMetrics.get(author);
-    
-                            // Obtener detalles del commit
-                            String commitUrl = commit.path("url").asText();
-                            ResponseEntity<JsonNode> commitDetails = restTemplate.exchange(commitUrl, HttpMethod.GET, entity, JsonNode.class);
-                            JsonNode stats = commitDetails.getBody().path("stats");
-    
-                            metrics.setLinesAdded(metrics.getLinesAdded() + stats.path("additions").asInt(0));
-                            metrics.setLinesRemoved(metrics.getLinesRemoved() + stats.path("deletions").asInt(0));
-                        }
-                    }
-                    page++;
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error al obtener líneas de commits del repositorio " + repo + ": " + e.getMessage());
-        }
-    }
-    
     
  
 

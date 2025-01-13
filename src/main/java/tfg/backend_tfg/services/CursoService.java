@@ -77,6 +77,13 @@ public class CursoService {
         this.tokenEncrypter = tokenEncrypter;
     }
 
+    public Optional<Curso> getCursoById(int id) {
+        return cursoRepository.findById(id);
+    }
+
+    public void save(Curso cursoExistente) {
+        cursoRepository.save(cursoExistente);
+    }
     //Leer estudiantes del excel con validaciones
     public ResponseEntity<?> uploadEstudiantes(MultipartFile file) {
         try {

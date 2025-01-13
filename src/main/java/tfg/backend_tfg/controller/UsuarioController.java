@@ -7,22 +7,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.data.util.Pair;
 
 import tfg.backend_tfg.dto.CursoSummaryDTO;
 import tfg.backend_tfg.dto.EquipoSummaryDTO;
-import tfg.backend_tfg.model.Curso;
-import tfg.backend_tfg.model.Estudiante;
 import tfg.backend_tfg.model.EstudianteCurso;
-import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.repository.EstudianteCursoRepository;
-import tfg.backend_tfg.repository.EstudianteEquipoRepository;
-import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.EquipoService;
-import tfg.backend_tfg.services.GithubService;
-import tfg.backend_tfg.services.TaigaService;
 import tfg.backend_tfg.services.UsuarioService;
 
 import java.util.HashMap;
@@ -37,26 +28,13 @@ import java.util.stream.Collectors;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
-    private final GithubService githubService;
-    private final TaigaService taigaService;
-    @Autowired
-    private final UsuarioRepository usuarioRepository;
 
      @Autowired
     private EquipoService equipoService;
 
-    @Autowired
-    private EstudianteEquipoRepository estudianteEquipoRepository;
 
-    @Autowired
-    private EstudianteCursoRepository estudianteCursoRepository;
-
-
-    public UsuarioController(UsuarioService usuarioService, UsuarioRepository usuarioRepository, GithubService githubService, TaigaService taigaService) {
+    public UsuarioController(UsuarioService usuarioService) {
         this.usuarioService = usuarioService;
-        this.usuarioRepository = usuarioRepository;
-        this.githubService = githubService;
-        this.taigaService = taigaService;
     }
 
     @GetMapping
@@ -89,7 +67,7 @@ public class UsuarioController {
             }
 
             // Obtener el listado de profesores
-            List<Usuario> profesores = usuarioRepository.findAllByRol(Rol.Profesor);
+            List<Usuario> profesores = usuarioService.getAllUsuariosByRol(Rol.Profesor);
             List<Map<String, Object>> response = profesores.stream().map(profesor -> {
                 Map<String, Object> profesorData = new HashMap<>();
                 profesorData.put("id", profesor.getId());
@@ -125,7 +103,7 @@ public class UsuarioController {
             String email = authentication.getName();
 
             // Buscar el usuario en la base de datos usando el correo electrónico
-            Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(email);
+            Optional<Usuario> usuarioOpt = usuarioService.getOptUsuarioByCorreo(email);
             if (usuarioOpt.isEmpty()) {
                 return ResponseEntity.status(404).body("Usuario no encontrado");
             }
@@ -154,9 +132,7 @@ public class UsuarioController {
         }
         // Obtener el ID del usuario desde el token JWT
         String correoAutenticado = authentication.getName();
-        int idAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."))
-                .getId();
+        int idAutenticado = usuarioService.getUsuarioByCorreo(correoAutenticado);
 
         // Verificar si el usuario autenticado tiene acceso a los datos solicitados
         if (idAutenticado != usuario_id) {
@@ -184,9 +160,7 @@ public class UsuarioController {
         }
         // Obtener el ID del usuario desde el token JWT
         String correoAutenticado = authentication.getName();
-        int idAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."))
-                .getId();
+        int idAutenticado = usuarioService.getUsuarioByCorreo(correoAutenticado);
 
         // Verificar si el usuario autenticado tiene acceso a los datos solicitados
         if (idAutenticado != id) {
@@ -194,11 +168,11 @@ public class UsuarioController {
         }
         try {
             // Obtener todos los cursos del estudiante
-            List<EstudianteCurso> cursosEstudiante = estudianteCursoRepository.findByEstudianteId(id);
+            List<EstudianteCurso> cursosEstudiante = usuarioService.getCursosEstudiante(id);
 
             // Filtrar cursos donde el estudiante ya tenga equipo
             List<CursoSummaryDTO> cursosSinEquipo = cursosEstudiante.stream()
-            .filter(ec -> estudianteEquipoRepository.findByEstudianteIdAndCursoId(id, ec.getCurso().getId()).isEmpty())
+            .filter(ec -> usuarioService.getEquiposEstudianteYaPresente(ec, id))
             .map(ec -> new CursoSummaryDTO(
                     ec.getCurso().getId(),
                     ec.getCurso().getNombreAsignatura(),

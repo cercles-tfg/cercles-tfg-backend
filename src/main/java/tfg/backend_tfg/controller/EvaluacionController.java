@@ -9,13 +9,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import tfg.backend_tfg.dto.CrearEvaluacionDTO;
-import tfg.backend_tfg.dto.EvaluacionDetalleDTO;
 import tfg.backend_tfg.dto.EvaluacionDetalleRequestDTO;
 import tfg.backend_tfg.dto.EvaluacionMediaDTO;
 import tfg.backend_tfg.dto.EvaluacionResumenDTO;
 import tfg.backend_tfg.model.Evaluacion;
-import tfg.backend_tfg.model.EvaluacionDetalle;
-import tfg.backend_tfg.repository.EvaluacionDetalleRepository;
 import tfg.backend_tfg.services.EvaluacionService;
 
 import java.util.List;
@@ -27,8 +24,6 @@ public class EvaluacionController {
 
     @Autowired
     private EvaluacionService evaluacionService;
-    @Autowired
-    private EvaluacionDetalleRepository evaluacionDetalleRepository;
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @PostMapping("/crear")
@@ -86,7 +81,7 @@ public class EvaluacionController {
 
     @GetMapping("/equipo/evaluacion-realizada/{evaluacionId}/{estudianteId}")
     public ResponseEntity<Boolean> isEvaluacionRealizada(@PathVariable Integer estudianteId, @PathVariable Integer evaluacionId) {
-        boolean realizada = evaluacionDetalleRepository.existsByEvaluacionIdAndEvaluadorId(evaluacionId, estudianteId);
+        boolean realizada = evaluacionService.existsByEvaluacionIdAndEvaluadorId(evaluacionId, estudianteId);
         return ResponseEntity.ok(realizada);
     }
 

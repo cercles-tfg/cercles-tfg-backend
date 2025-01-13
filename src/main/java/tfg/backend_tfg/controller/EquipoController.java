@@ -16,17 +16,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import tfg.backend_tfg.dto.CrearEquipoDTO;
 import tfg.backend_tfg.dto.EquipoDetalleDTO;
-import tfg.backend_tfg.dto.EquipoSummaryDTO;
 import tfg.backend_tfg.model.Equipo;
-import tfg.backend_tfg.model.Estudiante;
-import tfg.backend_tfg.repository.EstudianteRepository;
-import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.EquipoService;
+import tfg.backend_tfg.services.UsuarioService;
 
 @RestController
 @RequestMapping("/api/equipos")
@@ -36,10 +32,7 @@ public class EquipoController {
     private EquipoService equipoService;
 
     @Autowired
-    private EstudianteRepository estudianteRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private UsuarioService usuarioService;
 
 
     @GetMapping("/{equipoId}")
@@ -67,9 +60,7 @@ public class EquipoController {
         }
 
         String correo = authentication.getName();
-        int estudianteId = usuarioRepository.findByCorreo(correo)
-                .orElseThrow(() -> new IllegalArgumentException("Estudiante no encontrado o no es un estudiante."))
-                .getId();
+        int estudianteId = usuarioService.getUsuarioByCorreo(correo);
 
         try {
             // Validar que el estudiante o el profesor pertenece al curso

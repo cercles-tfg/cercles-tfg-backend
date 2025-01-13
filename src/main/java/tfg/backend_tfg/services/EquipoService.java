@@ -67,6 +67,9 @@ public class EquipoService {
         this.tokenEncrypter = tokenEncrypter;
     }
 
+    public String getTokenEquipo(int idEquipo){
+        return equipoRepository.findByEquipoId(idEquipo).getTokenGithubAsignatura();
+    }
 
     public void validarEstudianteCurso(int estudianteId, int cursoId) {
         // Crear la clave compuesta

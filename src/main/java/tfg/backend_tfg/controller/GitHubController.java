@@ -10,17 +10,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import tfg.backend_tfg.dto.MetricasUsuarioDTO;
-import tfg.backend_tfg.model.Equipo;
-import tfg.backend_tfg.model.Estudiante;
-import tfg.backend_tfg.repository.EquipoRepository;
-import tfg.backend_tfg.repository.EstudianteRepository;
 import tfg.backend_tfg.security.TokenEncrypter;
+import tfg.backend_tfg.services.EquipoService;
 import tfg.backend_tfg.services.GithubService;
+import tfg.backend_tfg.services.UsuarioService;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/github")
@@ -28,17 +24,17 @@ public class GitHubController {
 
     private final GithubService githubService;
     @Autowired
-    private final EstudianteRepository estudianteRepository;
+    private final UsuarioService usuarioService;
     @Autowired
-    private final EquipoRepository equipoRepository;
+    private final EquipoService equipoService;
     private final TokenEncrypter tokenEncrypter;
 
 
     
-    public GitHubController(GithubService githubService, EstudianteRepository estudianteRepository, EquipoRepository equipoRepository, TokenEncrypter tokenEncrypter) {
+    public GitHubController(GithubService githubService, UsuarioService usuarioService, EquipoService equipoService, TokenEncrypter tokenEncrypter) {
         this.githubService = githubService;
-        this.estudianteRepository = estudianteRepository;
-        this.equipoRepository = equipoRepository;
+        this.usuarioService = usuarioService;
+        this.equipoService = equipoService;
         this.tokenEncrypter = tokenEncrypter;
     }
 
@@ -120,14 +116,9 @@ public class GitHubController {
             }
 
             // Obtener usuarios GitHub de los estudiantes
-            List<String> usuarios = estudianteRepository.findAllById(estudiantesIds)
-                    .stream()
-                    .map(Estudiante::getGitUsername)
-                    .filter(username -> username != null && !username.isEmpty())
-                    .collect(Collectors.toList());
+            List<String> usuarios = usuarioService.getAllUsuariosById(estudiantesIds);
 
-
-            String tokenGithub = equipoRepository.findByEquipoId(idEquipo).getTokenGithubAsignatura();
+            String tokenGithub = equipoService.getTokenEquipo(idEquipo);
 
             String tokenDescifrado = null;
             try {
@@ -143,6 +134,44 @@ public class GitHubController {
             );
 
             return ResponseEntity.ok(metricasOrganizacion);
+        } catch (Exception e) {
+            e.printStackTrace(); // Log completo del error
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PreAuthorize("hasAuthority('PROFESOR')")
+    @GetMapping("/equipo/{idEquipo}/lineas-commits/{organizacion}")
+    public ResponseEntity<?> obtenerLineasCommits(@PathVariable String organizacion, @RequestParam List<Integer> estudiantesIds, @PathVariable Integer idEquipo) {
+        try {
+            // Verificar autenticación
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(403).body(Map.of("error", "Usuario no autenticado"));
+            }
+
+            // Obtener usuarios GitHub de los estudiantes
+            List<String> usuarios = usuarioService.getAllUsuariosById(estudiantesIds);
+
+            // Obtener el token GitHub asociado al equipo
+            String tokenGithub = equipoService.getTokenEquipo(idEquipo);
+
+            String tokenDescifrado = null;
+            try {
+                if (tokenGithub != null) {
+                    tokenDescifrado = tokenEncrypter.decrypt(tokenGithub);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error al descifrar el token del curso.", e);
+            }
+
+            // Llamada al servicio para obtener líneas de commits
+            Map<String, Object> lineasCommitsOrganizacion = githubService.obtenerLineasDeCommitsPorOrganizacion(
+                    organizacion, usuarios, tokenDescifrado
+            );
+
+            return ResponseEntity.ok(lineasCommitsOrganizacion);
         } catch (Exception e) {
             e.printStackTrace(); // Log completo del error
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

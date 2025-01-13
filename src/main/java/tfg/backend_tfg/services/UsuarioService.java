@@ -1,48 +1,95 @@
 package tfg.backend_tfg.services;
 
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import tfg.backend_tfg.model.Estudiante;
+import tfg.backend_tfg.model.EstudianteCurso;
+import tfg.backend_tfg.model.EstudianteEquipo;
 import tfg.backend_tfg.model.Profesor;
 import tfg.backend_tfg.model.Rol;
 import tfg.backend_tfg.model.Usuario;
+import tfg.backend_tfg.repository.EstudianteCursoRepository;
+import tfg.backend_tfg.repository.EstudianteEquipoRepository;
+import tfg.backend_tfg.repository.EstudianteRepository;
+import tfg.backend_tfg.repository.ProfesorCursoRepository;
 import tfg.backend_tfg.repository.UsuarioRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UsuarioService {
 
     @Autowired
     private final UsuarioRepository usuarioRepository;
+    @Autowired
+    private final EstudianteRepository estudianteRepository;
+    @Autowired
+    private final ProfesorCursoRepository profesorCursoRepository;
+    @Autowired
+    private final EstudianteCursoRepository estudianteCursoRepository;
+    @Autowired
+    private final EstudianteEquipoRepository estudianteEquipoRepository;
 
     @Autowired
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, ProfesorCursoRepository profesorCursoRepository, EstudianteCursoRepository estudianteCursoRepository, EstudianteEquipoRepository estudianteEquipoRepository) {
         this.usuarioRepository = usuarioRepository;
+        this.estudianteRepository = estudianteRepository;
+        this.profesorCursoRepository = profesorCursoRepository;
+        this.estudianteCursoRepository = estudianteCursoRepository;
+        this.estudianteEquipoRepository = estudianteEquipoRepository;
     }
+
 
     public List<Usuario> getAllUsuarios() {
         return usuarioRepository.findAll();
+    }
+
+    public boolean esUsuarioParteDelCurso(int usuarioId, int cursoId) {
+        boolean esEstudiante = estudianteCursoRepository.findByEstudianteIdAndCursoId(usuarioId, cursoId).isPresent();
+        boolean esProfesor = profesorCursoRepository.findByProfesorIdAndCursoId(usuarioId, cursoId).isPresent();
+        return esEstudiante || esProfesor;
+    }
+    
+
+    public List<String> getAllUsuariosById(List<Integer> estudiantesIds) {
+        return estudianteRepository.findAllById(estudiantesIds)
+                    .stream()
+                    .map(Estudiante::getGitUsername)
+                    .filter(username -> username != null && !username.isEmpty())
+                    .collect(Collectors.toList());
+
     }
 
     public Optional<Usuario> getUsuarioById(int id) {
         return usuarioRepository.findById(id);
     }
 
-    public Usuario saveUsuario(Usuario usuario) {
-        return usuarioRepository.save(usuario);
+    public Optional<Usuario> getOptUsuarioByCorreo(String correo) {
+        return usuarioRepository.findByCorreo(correo);
     }
 
-    public void deleteUsuario(int id) {
-        usuarioRepository.deleteById(id);
+    public List<Usuario> getAllUsuariosByRol(Rol rol) {
+        return usuarioRepository.findAllByRol(rol);
     }
 
-    public boolean existe(String correo) {
-        return usuarioRepository.findByCorreo(correo) != null;
+    public int getUsuarioByCorreo(String correoAutenticado) {
+        return usuarioRepository.findByCorreo(correoAutenticado)
+        .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."))
+        .getId();
+    }
+
+    public List<EstudianteCurso> getCursosEstudiante (int id) {
+        return estudianteCursoRepository.findByEstudianteId(id);
+    } 
+
+    public boolean getEquiposEstudianteYaPresente(EstudianteCurso ec, int id) {
+        return estudianteEquipoRepository.findByEstudianteIdAndCursoId(id, ec.getCurso().getId()).isEmpty();
     }
 
     public ResponseEntity<?> crearUsuario(String nombre, String correo, Rol rol) {

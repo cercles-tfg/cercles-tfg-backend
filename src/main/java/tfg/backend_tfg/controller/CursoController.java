@@ -27,34 +27,22 @@ import tfg.backend_tfg.dto.EstudianteDTO;
 import tfg.backend_tfg.model.Curso;
 import tfg.backend_tfg.model.CursoRequest;
 import tfg.backend_tfg.model.Usuario;
-import tfg.backend_tfg.repository.CursoRepository;
-import tfg.backend_tfg.repository.EstudianteCursoRepository;
-import tfg.backend_tfg.repository.ProfesorCursoRepository;
-import tfg.backend_tfg.repository.UsuarioRepository;
 import tfg.backend_tfg.services.CursoService;
 import tfg.backend_tfg.services.EquipoService;
+import tfg.backend_tfg.services.UsuarioService;
 
 @RestController
 @RequestMapping("/api/cursos")
 public class CursoController {
 
     @Autowired
-    private CursoRepository cursoRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private EstudianteCursoRepository estudianteCursoRepository;
-
-    @Autowired
-    private ProfesorCursoRepository profesorCursoRepository;
-
-    @Autowired
     private EquipoService equipoService;
 
     @Autowired
     private CursoService cursoService;
+
+    @Autowired
+    private UsuarioService usuarioService;
 
     @PreAuthorize("hasAuthority('PROFESOR')")
     @PostMapping("/uploadEstudiantes")
@@ -176,7 +164,7 @@ public class CursoController {
             }
     
             // Buscar el curso por ID
-            Optional<Curso> cursoExistenteOpt = cursoRepository.findById(id);
+            Optional<Curso> cursoExistenteOpt = cursoService.getCursoById(id);
             if (!cursoExistenteOpt.isPresent()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Curso no encontrado.");
             }
@@ -209,7 +197,7 @@ public class CursoController {
 
 
             // Guardar los cambios finales del curso
-            cursoRepository.save(cursoExistente);
+            cursoService.save(cursoExistente);
     
             return ResponseEntity.ok("Curso modificado exitosamente.");
     
@@ -248,18 +236,15 @@ public class CursoController {
 
         // Obtener el ID del usuario desde el token JWT
         String correoAutenticado = authentication.getName();
-        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+        Optional<Usuario> usuarioAutenticado = usuarioService.getOptUsuarioByCorreo(correoAutenticado);
 
         // Verificar que el usuario autenticado es parte del curso
-        boolean estaEnCurso = estudianteCursoRepository.findByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id)
-                .isPresent() || profesorCursoRepository.findByProfesorIdAndCursoId(usuarioAutenticado.getId(), id).isPresent();
+        boolean estaEnCurso = usuarioService.esUsuarioParteDelCurso(usuarioAutenticado.get().getId(), id);
         if (!estaEnCurso) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }
 
         try {
-            // Delegar la lógica al servicio
             Map<String, List<EstudianteDTO>> estudiantesPorCurso = cursoService.obtenerEstudiantesPorCurso(id);
             return ResponseEntity.ok(estudiantesPorCurso);
         } catch (Exception e) {
@@ -276,13 +261,11 @@ public class CursoController {
 
         // Obtener el ID del usuario desde el token JWT
         String correoAutenticado = authentication.getName();
-        Usuario usuarioAutenticado = usuarioRepository.findByCorreo(correoAutenticado)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+        Optional<Usuario> usuarioAutenticado = usuarioService.getOptUsuarioByCorreo(correoAutenticado);
 
-        // Comprobar que el usuario es estudiante del curso
-        boolean esEstudianteDelCurso = estudianteCursoRepository.existsByEstudianteIdAndCursoId(usuarioAutenticado.getId(), id) 
-            || profesorCursoRepository.findByProfesorIdAndCursoId(usuarioAutenticado.getId(), id).isPresent();
-        if (!esEstudianteDelCurso) {
+        // Verificar que el usuario autenticado es parte del curso
+        boolean estaEnCurso = usuarioService.esUsuarioParteDelCurso(usuarioAutenticado.get().getId(), id);
+        if (!estaEnCurso) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }
 

@@ -46,7 +46,13 @@ public class EvaluacionService {
     @Autowired
     private EquipoRepository equipoRepository;
 
+    @Autowired
+    private EvaluacionDetalleRepository evaluacionDetalleRepository;
 
+
+    public boolean existsByEvaluacionIdAndEvaluadorId(int evaluacionId, int estudianteId) {
+        return evaluacionDetalleRepository.existsByEvaluacionIdAndEvaluadorId(evaluacionId, estudianteId);
+    }
 
     public Evaluacion crearEvaluacion(CrearEvaluacionDTO crearEvaluacionDTO) {
         Evaluacion evaluacion = Evaluacion.builder()
@@ -226,12 +232,12 @@ public class EvaluacionService {
                 .getCurso();
     
         LocalDate today = LocalDate.now();
-    
+        
         return evaluacionRepository.findByCursoId(curso.getId()).stream()
                 .filter(evaluacion -> !today.isBefore(evaluacion.getFechaInicio()) && !today.isAfter(evaluacion.getFechaFin()))
                 .map(Evaluacion::getId)
                 .findFirst()
-                .orElse(null);
+                .orElse(0);
     }
     
 

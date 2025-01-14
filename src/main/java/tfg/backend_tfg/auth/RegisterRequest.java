@@ -1,6 +1,6 @@
 package tfg.backend_tfg.auth;
 
-import tfg.backend_tfg.model.Role;
+import tfg.backend_tfg.model.Rol;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +16,7 @@ import lombok.Setter;
 public class RegisterRequest {
     private String correo; 
     private String nombre;  
-    private Role role;  
+    private Rol rol;  
 
     public String getCorreo() {
         return correo;
@@ -34,12 +34,12 @@ public class RegisterRequest {
         this.nombre = nombre;
     }
 
-    public Role getRole() {
-        return role;
+    public Rol getRol() {
+        return rol;
     }
 
-    public void setRole(Role role) {
-        this.role = role;
+    public void setRol(Rol rol) {
+        this.rol = rol;
     }
 }
 

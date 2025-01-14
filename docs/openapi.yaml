@@ -1,0 +1,2068 @@
+openapi: 3.0.0
+servers:
+  - description: CERCLES API
+    url: http://localhost:8080
+info:
+  version: "1.0.0"
+  title: CERCLES API Documentation
+  description: >-
+    Esta API proporciona los endpoints para la aplicación CERCLES.
+components:
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Ingrese su token JWT para autenticar las solicitudes"
+
+security:
+  - BearerToken: []
+
+tags:
+  - name: Autorización
+    description: Obtener autorización para entrar a la app
+  - name: Usuarios
+    description: Obtener información de los usuarios
+  - name: Cursos
+    description: Obtener información de los cursos
+  - name: Equipos
+    description: Obtener información de los equipos
+  - name: Evaluación
+    description: Obtener información de las evaluaciones
+  - name: GitHub
+    description: Obtener información de GitHub
+  - name: Taiga
+    description: Obtener información de Taiga
+
+paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Autorización
+      summary: Autenticar usuario con Google
+      description: Este endpoint permite a un usuario autenticarse utilizando un token de Google.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                googleToken:
+                  type: string
+                  description: El token de autenticación de Google proporcionado por el cliente.
+              required:
+                - googleToken
+      responses:
+        "200":
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jwtToken:
+                    type: string
+                    description: El token JWT generado.
+                  rol:
+                    type: string
+                    description: El rol del usuario autenticado.
+                  id:
+                    type: string
+                    description: El identificador único del usuario autenticado.
+        "403":
+          description: Error en la autenticación
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Token de Google no válido o el usuario no está registrado.
+
+  /api/usuarios/{id}:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener información de un usuario por ID
+      description: >
+        Este endpoint permite obtener la información de un usuario específico mediante su identificador único (ID).
+        Devuelve detalles como el nombre, correo y rol del usuario.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del usuario.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Información del usuario obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: El identificador único del usuario.
+                  nombre:
+                    type: string
+                    description: El nombre del usuario.
+                  correo:
+                    type: string
+                    description: El correo electrónico del usuario.
+                  rol:
+                    type: string
+                    description: El rol del usuario (Estudiante o Profesor).
+        "404":
+          description: Usuario no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no encontrado.
+  /api/usuarios/crear:
+    post:
+      tags:
+        - Usuarios
+      summary: Crear un nuevo usuario
+      description: >
+        Este endpoint permite a los profesores crear un nuevo usuario en el sistema. 
+        El usuario puede ser de tipo Estudiante o Profesor y requiere un correo único.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                correo:
+                  type: string
+                  description: El correo electrónico único del usuario a crear.
+                nombre:
+                  type: string
+                  description: El nombre del usuario.
+                rol:
+                  type: string
+                  enum:
+                    - Estudiante
+                    - Profesor
+                  description: El rol del usuario (Estudiante o Profesor).
+              required:
+                - correo
+                - nombre
+                - rol
+      responses:
+        "201":
+          description: Usuario creado exitosamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario creado exitosamente
+        "400":
+          description: Solicitud inválida (Rol no válido)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Rol inválido
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado
+        "409":
+          description: Conflicto (Correo ya registrado)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario con el correo ya existe
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al crear el usuario
+  /api/usuarios/profesores:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener lista de profesores
+      description: >
+        Este endpoint permite obtener un listado de todos los profesores registrados en el sistema. 
+        Devuelve información básica de cada profesor, como su ID, nombre y correo.
+      responses:
+        "200":
+          description: Lista de profesores obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: El identificador único del profesor.
+                    nombre:
+                      type: string
+                      description: El nombre del profesor.
+                    correo:
+                      type: string
+                      description: El correo electrónico del profesor.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los profesores
+  /api/usuarios/datos:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener datos del usuario autenticado
+      description: >
+        Este endpoint permite obtener los datos del usuario actualmente autenticado en el sistema. 
+        Devuelve información básica como el nombre, correo, y los nombres de usuario asociados a GitHub y Taiga.
+      responses:
+        "200":
+          description: Datos del usuario obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nombre:
+                    type: string
+                    description: El nombre del usuario.
+                  correo:
+                    type: string
+                    description: El correo electrónico del usuario.
+                  gitUsername:
+                    type: string
+                    description: El nombre de usuario asociado a GitHub (puede ser nulo).
+                  taigaUsername:
+                    type: string
+                    description: El nombre de usuario asociado a Taiga (puede ser nulo).
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "404":
+          description: Usuario no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error interno del servidor.
+  /api/usuarios/{id}/equipos:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener los equipos asociados a un usuario
+      description: >
+        Este endpoint permite obtener una lista de los equipos a los que pertenece un usuario específico. 
+        Solo el propio usuario autenticado puede acceder a sus datos.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del usuario cuyos equipos se quieren consultar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de equipos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del equipo.
+                    nombre:
+                      type: string
+                      description: El nombre del equipo.
+                    cursoId:
+                      type: integer
+                      description: El identificador del curso al que pertenece el equipo.
+                    cursoNombre:
+                      type: string
+                      description: El nombre del curso al que pertenece el equipo.
+                    evaluadorId:
+                      type: integer
+                      description: El identificador del profesor evaluador del curso.
+                    cursoActivo:
+                      type: boolean
+                      description: Indica si el curso está activo.
+        "403":
+          description: Acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Acceso denegado. Solo el usuario autenticado puede consultar sus equipos.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error en los datos proporcionados.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error interno del servidor.
+  /api/usuarios/{id}/cursos:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener cursos disponibles para un estudiante
+      description: >
+        Este endpoint permite obtener una lista de los cursos disponibles para un estudiante donde aún no tiene un equipo asignado.
+        Solo el propio estudiante autenticado puede consultar sus cursos.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del estudiante cuyos cursos se quieren consultar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de cursos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del curso.
+                    nombreAsignatura:
+                      type: string
+                      description: El nombre de la asignatura del curso.
+                    añoInicio:
+                      type: integer
+                      description: El año de inicio del curso.
+                    cuatrimestre:
+                      type: integer
+                      description: El cuatrimestre en el que se imparte el curso.
+                    activo:
+                      type: boolean
+                      description: Indica si el curso está activo.
+                    equipos:
+                      type: integer
+                      description: Número de equipos en el curso (valor fijo a 0 para este endpoint).
+                    numeroEstudiantes:
+                      type: integer
+                      description: Número de estudiantes en el curso (valor fijo a 0 para este endpoint).
+                    numeroEstudiantesSinEquipo:
+                      type: integer
+                      description: Número de estudiantes sin equipo en el curso (valor fijo a 0 para este endpoint).
+        "403":
+          description: Acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Acceso denegado. Solo el estudiante autenticado puede consultar sus cursos.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error interno del servidor.
+
+  /api/cursos/crear:
+    post:
+      tags:
+        - Cursos
+      summary: Crear un nuevo curso
+      description: >
+        Este endpoint permite a un profesor crear un nuevo curso. Se deben de asignar profesores,
+        estudiantes y establecer los periodos de evaluación para el curso.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombreAsignatura:
+                  type: string
+                  description: El nombre de la asignatura del curso.
+                añoInicio:
+                  type: integer
+                  description: El año de inicio del curso.
+                cuatrimestre:
+                  type: integer
+                  description: El cuatrimestre en el que se imparte el curso.
+                activo:
+                  type: boolean
+                  description: Indica si el curso estará activo.
+                profesores:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de IDs de los profesores que serán asignados al curso.
+                estudiantes:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de IDs de los estudiantes que serán asignados al curso.
+                periodosEvaluacion:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      fechaInicio:
+                        type: string
+                        format: date
+                        description: Fecha de inicio del periodo de evaluación.
+                      fechaFin:
+                        type: string
+                        format: date
+                        description: Fecha de finalización del periodo de evaluación.
+      responses:
+        "201":
+          description: Curso creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del curso.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Datos de solicitud no válidos.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado o sin permisos.
+        "409":
+          description: Conflicto (Curso activo ya existente)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso activo ya existente. ¿Desea desactivarlo?
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al crear el curso.
+  /api/cursos/{id}:
+    get:
+      tags:
+        - Cursos
+      summary: Obtener detalles de un curso
+      description: >
+        Este endpoint permite a un profesor obtener detalles completos de un curso específico. 
+        Incluye información sobre los estudiantes sin equipo, los equipos con sus miembros y los profesores asociados al curso.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del curso cuyos detalles se desean obtener.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detalles del curso obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: El identificador único del curso.
+                  nombreAsignatura:
+                    type: string
+                    description: El nombre de la asignatura del curso.
+                  añoInicio:
+                    type: integer
+                    description: El año de inicio del curso.
+                  cuatrimestre:
+                    type: integer
+                    description: El cuatrimestre en el que se imparte el curso.
+                  activo:
+                    type: boolean
+                    description: Indica si el curso está activo.
+                  estudiantesSinGrupo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nombre:
+                          type: string
+                          description: Nombre del estudiante sin equipo.
+                        correo:
+                          type: string
+                          description: Correo electrónico del estudiante sin equipo.
+                  equipos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nombre:
+                          type: string
+                          description: Nombre del equipo.
+                        id:
+                          type: integer
+                          description: Identificador del equipo.
+                        evaluadorId:
+                          type: integer
+                          description: Identificador del evaluador del equipo (si existe).
+                        miembros:
+                          type: array
+                          items:
+                            type: string
+                            description: Nombre de los estudiantes en el equipo.
+                  profesores:
+                    type: array
+                    items:
+                      type: string
+                      description: Nombre de los profesores asociados al curso.
+        "403":
+          description: Acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado o sin permisos.
+        "404":
+          description: Curso no encontrado o acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso no encontrado o no tiene acceso a este curso.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los detalles del curso.
+  /api/cursos/{id}/modificar_curso:
+    put:
+      tags:
+        - Cursos
+      summary: Modificar un curso existente
+      description: >
+        Este endpoint permite a un profesor modificar un curso existente. Los cambios incluyen la actualización
+        de los datos básicos del curso, la adición o eliminación de estudiantes y profesores, y el manejo de relaciones asociadas.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del curso a modificar.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombreAsignatura:
+                  type: string
+                  description: El nombre de la asignatura del curso.
+                añoInicio:
+                  type: integer
+                  description: El año de inicio del curso.
+                cuatrimestre:
+                  type: integer
+                  description: El cuatrimestre en el que se imparte el curso.
+                estudiantesAñadir:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      correo:
+                        type: string
+                        description: El correo del estudiante a añadir.
+                      nombre:
+                        type: string
+                        description: El nombre del estudiante.
+                estudiantesBorrar:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      correo:
+                        type: string
+                        description: El correo del estudiante a borrar.
+                profesoresAñadir:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      correo:
+                        type: string
+                        description: El correo del profesor a añadir.
+                      nombre:
+                        type: string
+                        description: El nombre del profesor.
+                profesoresBorrar:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      correo:
+                        type: string
+                        description: El correo del profesor a borrar.
+      responses:
+        "200":
+          description: Curso modificado exitosamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso modificado exitosamente.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Datos de solicitud no válidos.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado o sin permisos.
+        "404":
+          description: Curso no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso no encontrado.
+        "409":
+          description: Conflicto al actualizar datos del curso
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Ya existe un curso activo con el mismo nombre, año y cuatrimestre.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al modificar el curso.
+  /api/cursos/{id}/borrar:
+    delete:
+      tags:
+        - Cursos
+      summary: Borrar un curso existente
+      description: >
+        Este endpoint permite a un profesor borrar un curso específico identificado por su ID.
+        Solo un usuario con rol de profesor puede realizar esta acción.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del curso a borrar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Curso borrado exitosamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso borrado exitosamente.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "404":
+          description: Curso no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al borrar el curso.
+  /api/cursos/verificarCursoExistente:
+    post:
+      tags:
+        - Cursos
+      summary: Verificar si un curso activo ya existe
+      description: >
+        Este endpoint permite a un profesor verificar si un curso con los mismos datos (nombre, año, cuatrimestre) ya existe como curso activo.
+        Devuelve un mensaje indicando si hay un conflicto o si no hay ningún curso activo similar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombreAsignatura:
+                  type: string
+                  description: El nombre de la asignatura del curso.
+                añoInicio:
+                  type: integer
+                  description: El año de inicio del curso.
+                cuatrimestre:
+                  type: integer
+                  description: El cuatrimestre en el que se imparte el curso.
+      responses:
+        "200":
+          description: No hay conflicto, el curso no existe como activo
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: No hay conflicto
+        "409":
+          description: Curso activo ya existente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Curso activo ya existente. ¿Desea desactivarlo?
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al verificar el curso existente.
+  /api/cursos:
+    get:
+      tags:
+        - Cursos
+      summary: Obtener cursos asociados a un profesor
+      description: >
+        Este endpoint permite a un profesor autenticado obtener una lista de los cursos que está gestionando. 
+        Devuelve detalles de cada curso, como su nombre, año, cuatrimestre, estado activo y el número de estudiantes inscritos.
+      responses:
+        "200":
+          description: Lista de cursos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del curso.
+                    nombreAsignatura:
+                      type: string
+                      description: El nombre de la asignatura del curso.
+                    añoInicio:
+                      type: integer
+                      description: El año de inicio del curso.
+                    cuatrimestre:
+                      type: integer
+                      description: El cuatrimestre en el que se imparte el curso.
+                    activo:
+                      type: boolean
+                      description: Indica si el curso está activo.
+                    numeroEstudiantes:
+                      type: integer
+                      description: El número de estudiantes inscritos en el curso.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los cursos.
+  /api/cursos/{cursoId}/equipos:
+    get:
+      tags:
+        - Cursos
+      summary: Obtener equipos asociados a un curso
+      description: >
+        Este endpoint permite obtener una lista de los equipos pertenecientes a un curso específico. 
+        Puede ser accedido tanto por estudiantes como por profesores autenticados.
+      parameters:
+        - name: cursoId
+          in: path
+          required: true
+          description: El identificador único del curso cuyos equipos se quieren consultar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de equipos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del equipo.
+                    nombre:
+                      type: string
+                      description: El nombre del equipo.
+                    cursoId:
+                      type: integer
+                      description: El identificador del curso al que pertenece el equipo.
+                    evaluadorId:
+                      type: integer
+                      description: El identificador del profesor evaluador del equipo.
+                    cursoNombre:
+                      type: string
+                      description: El nombre del curso al que pertenece el equipo.
+                    activo:
+                      type: boolean
+                      description: Indica si el curso está activo.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: El curso especificado no existe.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los equipos.
+  /api/cursos/{id}/estudiantes:
+    get:
+      tags:
+        - Cursos
+      summary: Obtener estudiantes de un curso
+      description: >
+        Este endpoint permite obtener una lista de los estudiantes de un curso específico. 
+        Devuelve dos listas separadas: una con estudiantes que tienen equipo y otra con estudiantes sin equipo.
+        Solo los estudiantes autenticados que pertenecen al curso pueden acceder a esta información.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del curso cuyos estudiantes se quieren consultar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de estudiantes obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conEquipo:
+                    type: array
+                    description: Lista de estudiantes que tienen equipo.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: El identificador único del estudiante.
+                        nombre:
+                          type: string
+                          description: El nombre del estudiante.
+                        correo:
+                          type: string
+                          description: El correo electrónico del estudiante.
+                  sinEquipo:
+                    type: array
+                    description: Lista de estudiantes que no tienen equipo.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: El identificador único del estudiante.
+                        nombre:
+                          type: string
+                          description: El nombre del estudiante.
+                        correo:
+                          type: string
+                          description: El correo electrónico del estudiante.
+        "403":
+          description: Acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado o sin permisos.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los estudiantes.
+  /api/cursos/{id}/profesores:
+    get:
+      tags:
+        - Cursos
+      summary: Obtener profesores de un curso
+      description: >
+        Este endpoint permite obtener una lista de los profesores asignados a un curso específico.
+        Solo los estudiantes autenticados que pertenecen al curso pueden acceder a esta información.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: El identificador único del curso cuyos profesores se quieren consultar.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de profesores obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: El identificador único del profesor.
+                    nombre:
+                      type: string
+                      description: El nombre del profesor.
+                    correo:
+                      type: string
+                      description: El correo electrónico del profesor.
+        "403":
+          description: Acceso denegado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado o sin permisos.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener los profesores.
+  /api/cursos/uploadEstudiantes:
+    post:
+      tags:
+        - Cursos
+      summary: Subir estudiantes mediante archivo Excel
+      description: >
+        Este endpoint permite a un profesor subir un archivo Excel (.xlsx) con los datos de los estudiantes para añadirlos al curso correspondiente.
+        El archivo debe tener un formato válido, con una columna para nombres y apellidos en el formato "Apellidos, Nombre" y otra para correos electrónicos.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Archivo Excel (.xlsx) con los datos de los estudiantes.
+      responses:
+        "200":
+          description: Estudiantes procesados exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    nombre:
+                      type: string
+                      description: El nombre completo del estudiante.
+                    correo:
+                      type: string
+                      description: El correo electrónico del estudiante.
+        "400":
+          description: Formato del archivo no válido o errores en los datos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Por favor sube un archivo Excel válido.
+        "403":
+          description: Usuario no autenticado o sin permisos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al procesar el archivo.
+
+  /api/equipos/{equipoId}:
+    get:
+      tags:
+        - Equipos
+      summary: Obtener detalle de un equipo
+      description: >
+        Este endpoint permite obtener información detallada sobre un equipo específico. 
+        Devuelve datos sobre el equipo, el curso asociado, el evaluador, los estudiantes y la organización de GitHub asociada.
+      parameters:
+        - name: equipoId
+          in: path
+          required: true
+          description: El identificador único del equipo.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detalle del equipo obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Identificador único del equipo.
+                  nombre:
+                    type: string
+                    description: Nombre del equipo.
+                  curso:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Identificador único del curso.
+                      nombreAsignatura:
+                        type: string
+                        description: Nombre de la asignatura asociada al curso.
+                      añoInicio:
+                        type: integer
+                        description: Año de inicio del curso.
+                      cuatrimestre:
+                        type: integer
+                        description: Cuatrimestre en el que se imparte el curso.
+                      activo:
+                        type: boolean
+                        description: Indica si el curso está activo.
+                  evaluador:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Identificador único del evaluador.
+                      nombre:
+                        type: string
+                        description: Nombre del evaluador.
+                      correo:
+                        type: string
+                        description: Correo electrónico del evaluador.
+                  estudiantes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Identificador único del estudiante.
+                        nombre:
+                          type: string
+                          description: Nombre del estudiante.
+                        correo:
+                          type: string
+                          description: Correo electrónico del estudiante.
+                  gitOrganizacion:
+                    type: string
+                    description: Organización de GitHub asociada al equipo.
+        "400":
+          description: El equipo especificado no existe
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: El equipo especificado no existe.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener el detalle del equipo.
+  /api/equipos/crear:
+    post:
+      tags:
+        - Equipos
+      summary: Crear un equipo
+      description: >
+        Este endpoint permite a un estudiante crear un equipo dentro de un curso específico.
+        El estudiante debe ser parte del curso para realizar esta operación.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  description: Nombre del equipo.
+                cursoId:
+                  type: integer
+                  description: Identificador único del curso al que pertenece el equipo.
+                evaluadorId:
+                  type: integer
+                  description: Identificador único del profesor evaluador.
+                estudiantesIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de identificadores únicos de los estudiantes que formarán parte del equipo.
+      responses:
+        "201":
+          description: Equipo creado exitosamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Equipo creado exitosamente.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Mensaje de error.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al crear el equipo.
+  /api/equipos/{id}/borrar:
+    delete:
+      tags:
+        - Equipos
+      summary: Borrar un equipo
+      description: >
+        Este endpoint permite a un estudiante o profesor borrar un equipo específico. 
+        El equipo debe existir en el sistema.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Equipo borrado exitosamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Equipo borrado exitosamente.
+        "404":
+          description: Equipo no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Equipo no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al borrar el equipo.
+  /api/equipos/{equipoId}/salir:
+    delete:
+      tags:
+        - Equipos
+      summary: Salir de un equipo
+      description: >
+        Este endpoint permite a un estudiante salir de un equipo específico al que pertenece.
+        Si el equipo queda sin miembros, será eliminado.
+      parameters:
+        - name: equipoId
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estudianteId:
+                  type: integer
+                  description: Identificador único del estudiante que sale del equipo.
+      responses:
+        "200":
+          description: Estudiante salió del equipo correctamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Estudiante salió del equipo correctamente.
+        "404":
+          description: Equipo o estudiante no encontrado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Equipo o estudiante no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al salir del equipo.
+  /api/equipos/{id}/add_member:
+    post:
+      tags:
+        - Equipos
+      summary: Añadir miembros a un equipo
+      description: >
+        Este endpoint permite a un profesor o estudiante añadir nuevos miembros a un equipo existente.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estudiantesIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de identificadores únicos de los estudiantes a añadir.
+      responses:
+        "200":
+          description: Miembros añadidos correctamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Miembros añadidos correctamente al equipo.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Mensaje de error.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al añadir los miembros al equipo.
+  /api/equipos/{id}/borrar_miembros:
+    delete:
+      tags:
+        - Equipos
+      summary: Eliminar miembros de un equipo
+      description: >
+        Este endpoint permite a un profesor o estudiante eliminar miembros de un equipo existente.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estudiantesIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de identificadores únicos de los estudiantes a eliminar.
+      responses:
+        "200":
+          description: Miembros eliminados correctamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Miembros eliminados correctamente del equipo.
+        "400":
+          description: Solicitud inválida
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Mensaje de error.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al eliminar los miembros del equipo.
+
+  /api/evaluaciones/crear:
+    post:
+      tags:
+        - Evaluación
+      summary: Crear una nueva evaluación
+      description: >
+        Este endpoint permite a un profesor crear una nueva evaluación asociada a un curso. 
+        Requiere proporcionar las fechas de inicio y fin de la evaluación, así como el identificador del curso correspondiente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fechaInicio:
+                  type: string
+                  format: date
+                  description: Fecha de inicio de la evaluación en formato `YYYY-MM-DD`.
+                fechaFin:
+                  type: string
+                  format: date
+                  description: Fecha de fin de la evaluación en formato `YYYY-MM-DD`.
+                cursoId:
+                  type: integer
+                  description: Identificador único del curso al que pertenece la evaluación.
+              required:
+                - fechaInicio
+                - fechaFin
+                - cursoId
+      responses:
+        "200":
+          description: Evaluación creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Identificador único de la evaluación creada.
+                  fechaInicio:
+                    type: string
+                    format: date
+                    description: Fecha de inicio de la evaluación.
+                  fechaFin:
+                    type: string
+                    format: date
+                    description: Fecha de fin de la evaluación.
+                  cursoId:
+                    type: integer
+                    description: Identificador único del curso asociado.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "400":
+          description: Error en los datos proporcionados
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Formato incorrecto de las fechas o curso no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al crear la evaluación.
+  /api/evaluaciones/equipo/{equipoId}:
+    get:
+      tags:
+        - Evaluación
+      summary: Obtener evaluaciones realizadas por equipo
+      description: >
+        Este endpoint permite obtener las evaluaciones realizadas para un equipo específico. 
+        Las evaluaciones pueden ser filtradas por una lista de identificadores opcionales.
+      parameters:
+        - name: equipoId
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+        - name: evaluacionIds
+          in: query
+          required: false
+          description: >
+            Lista opcional de identificadores de evaluaciones para filtrar los resultados.
+          schema:
+            type: array
+            items:
+              type: integer
+      responses:
+        "200":
+          description: Evaluaciones obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    evaluadoId:
+                      type: integer
+                      description: Identificador único del estudiante evaluado.
+                    evaluaciones:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          evaluacionId:
+                            type: integer
+                            description: Identificador único de la evaluación.
+                          detallesEvaluacion:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                evaluadorId:
+                                  type: integer
+                                  description: Identificador único del estudiante evaluador.
+                                puntos:
+                                  type: integer
+                                  description: Puntos otorgados en la evaluación.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "400":
+          description: Parámetros inválidos
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Identificador del equipo no válido.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener las evaluaciones.
+  /api/evaluaciones/equipo/{equipoId}/medias:
+    get:
+      tags:
+        - Evaluación
+      summary: Obtener medias de evaluaciones por equipo
+      description: >
+        Este endpoint permite calcular y obtener las medias de las evaluaciones realizadas para un equipo específico, 
+        incluyendo las medias por cada evaluación y las medias generales de los compañeros y autoevaluaciones.
+      parameters:
+        - name: equipoId
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Medias obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    estudianteId:
+                      type: integer
+                      description: Identificador único del estudiante evaluado.
+                    mediasPorEvaluacion:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          evaluacionId:
+                            type: integer
+                            description: Identificador único de la evaluación.
+                          mediaDeCompañeros:
+                            type: number
+                            format: float
+                            description: Media de los puntos asignados por los compañeros.
+                          notaPropia:
+                            type: number
+                            format: float
+                            description: Puntos asignados en la autoevaluación.
+                    mediaGeneralDeCompañeros:
+                      type: number
+                      format: float
+                      description: Media general de los puntos asignados por los compañeros en todas las evaluaciones.
+                    mediaGeneralPropia:
+                      type: number
+                      format: float
+                      description: Media general de los puntos asignados en autoevaluaciones.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "400":
+          description: Identificador de equipo no válido
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Equipo no encontrado.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al obtener las medias.
+  /api/evaluaciones/equipo/{equipoId}/evaluacion-activa:
+    get:
+      tags:
+        - Evaluación
+      summary: Verificar si hay una evaluación activa
+      description: >
+        Este endpoint permite verificar si hay una evaluación activa para un equipo específico.
+      parameters:
+        - name: equipoId
+          in: path
+          required: true
+          description: Identificador único del equipo.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Evaluación activa verificada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    activa:
+                      type: boolean
+                      description: Booleano de si activa o no
+                    fechaIni:
+                      type: string
+                      description: fecha inicio
+                    fechaFin:
+                      type: string
+                      description: fecha fin
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al verificar la evaluación activa.
+  /api/evaluaciones/estudiante/crear:
+    post:
+      tags:
+        - Evaluación
+      summary: Crear detalles de una evaluación
+      description: >
+        Este endpoint permite a un estudiante crear detalles de una evaluación para los miembros de su equipo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                evaluacionId:
+                  type: integer
+                  description: Identificador único de la evaluación.
+                evaluadorId:
+                  type: integer
+                  description: Identificador único del estudiante que realiza la evaluación.
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      evaluadoId:
+                        type: integer
+                        description: Identificador único del estudiante evaluado.
+                      puntos:
+                        type: integer
+                        description: Puntos asignados al estudiante evaluado.
+      responses:
+        "200":
+          description: Evaluación guardada correctamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Evaluación guardada correctamente.
+        "403":
+          description: Usuario no autenticado
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Usuario no autenticado.
+        "400":
+          description: Error en la solicitud
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: La suma de puntos asignados no coincide con el máximo permitido.
+        "500":
+          description: Error interno del servidor
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Error al guardar la evaluación.
+
+  /api/github/validar-organizacion:
+    post:
+      tags:
+        - GitHub
+      summary: Validar organización en GitHub
+      description: >
+        Este endpoint permite validar si una organización de GitHub cumple con los requisitos específicos 
+        como tener ciertos miembros, un profesor configurado, y si la cuenta 'professorat-amep' es miembro y admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organizacionUrl:
+                  type: string
+                  description: URL de la organización en GitHub.
+                  example: "https://github.com/orgName"
+                miembrosIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: Lista de IDs de los miembros que deben ser validados.
+                profesorId:
+                  type: integer
+                  description: ID del profesor que será validado en la organización.
+      responses:
+        "200":
+          description: Validación exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  todosUsuariosGitConfigurados:
+                    type: boolean
+                    description: Indica si todos los usuarios tienen configurado su GitHub.
+                  profesorGitConfigurado:
+                    type: boolean
+                    description: Indica si el profesor tiene configurado su GitHub.
+                  professoratEsMiembro:
+                    type: boolean
+                    description: Indica si la cuenta 'professorat-amep' es miembro de la organización.
+                  professoratEsAdmin:
+                    type: boolean
+                    description: Indica si la cuenta 'professorat-amep' es admin de la organización.
+                  todosMiembrosEnOrganizacion:
+                    type: boolean
+                    description: Indica si todos los miembros especificados están en la organización.
+                  profesorEnOrganizacion:
+                    type: boolean
+                    description: Indica si el profesor está en la organización.
+        "403":
+          description: Usuario no autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /api/github/confirmar-organizacion:
+    post:
+      tags:
+        - GitHub
+      summary: Confirmar organización en GitHub
+      description: >
+        Este endpoint asigna una organización a un equipo después de haber sido validada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                equipoId:
+                  type: integer
+                  description: ID del equipo al cual se asociará la organización.
+                organizacionUrl:
+                  type: string
+                  description: URL de la organización en GitHub.
+      responses:
+        "200":
+          description: Organización asignada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /api/github/metrics/{organizacion}:
+    get:
+      tags:
+        - GitHub
+      summary: Obtener métricas de GitHub para una organización
+      description: >
+        Este endpoint permite obtener métricas detalladas (commits, líneas añadidas/eliminadas, pull requests) de una organización específica en GitHub.
+      parameters:
+        - name: organizacion
+          in: path
+          required: true
+          description: Nombre de la organización en GitHub.
+          schema:
+            type: string
+        - name: estudiantesIds
+          in: query
+          required: true
+          description: Lista de IDs de los estudiantes cuyos datos se desean obtener.
+          schema:
+            type: array
+            items:
+              type: integer
+      responses:
+        "200":
+          description: Métricas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                      description: Nombre de usuario en GitHub.
+                    nombre:
+                      type: string
+                      description: Nombre del estudiante.
+                    totalCommits:
+                      type: integer
+                      description: Total de commits realizados.
+                    linesAdded:
+                      type: integer
+                      description: Líneas añadidas.
+                    linesRemoved:
+                      type: integer
+                      description: Líneas eliminadas.
+                    pullRequestsCreated:
+                      type: integer
+                      description: Pull requests creadas.
+        "403":
+          description: Usuario no autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /api/github/callback:
+    post:
+      tags:
+        - GitHub
+      summary: Conectar usuario con GitHub
+      description: >
+        Este endpoint gestiona el callback de GitHub OAuth para conectar la cuenta de GitHub del usuario con su perfil en el sistema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Código de autorización proporcionado por GitHub.
+                  example: "123abc456def"
+      responses:
+        "200":
+          description: Conexión exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Mensaje de confirmación.
+                    example: "Cuenta de GitHub asociada exitosamente"
+                  githubUsername:
+                    type: string
+                    description: Nombre de usuario en GitHub.
+                    example: "johnDoeGitHub"
+        "400":
+          description: Código faltante o inválido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Código de GitHub faltante"
+        "403":
+          description: Usuario no autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Usuario no autenticado"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Error interno del servidor"
+  /api/github/disconnect:
+    delete:
+      tags:
+        - GitHub
+      summary: Desconectar cuenta de GitHub
+      description: >
+        Este endpoint permite a un usuario desconectar su cuenta de GitHub del sistema.
+      responses:
+        "200":
+          description: Cuenta desconectada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "403":
+          description: Usuario no autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /api/github/user-data:
+    get:
+      tags:
+        - GitHub
+      summary: Obtener datos del usuario en GitHub
+      description: >
+        Este endpoint permite a un usuario autenticado recuperar información sobre sus repositorios y organizaciones asociadas en GitHub.
+      responses:
+        "200":
+          description: Datos obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repositorios:
+                    type: array
+                    description: Lista de repositorios asociados al usuario.
+                    items:
+                      type: object
+                      additionalProperties: true
+                  organizaciones:
+                    type: array
+                    description: Lista de organizaciones a las que pertenece el usuario.
+                    items:
+                      type: object
+                      additionalProperties: true
+        "403":
+          description: Usuario no autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Usuario no autenticado"
+        "404":
+          description: Datos no encontrados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Datos no encontrados para este usuario."
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Error interno del servidor"

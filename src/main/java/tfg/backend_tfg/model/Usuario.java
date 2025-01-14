@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
+import java.lang.classfile.constantpool.IntegerEntry;
 import java.util.Collection;
 import java.util.List;
 
@@ -22,8 +23,8 @@ import java.util.List;
     property = "rol"
 )
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = Estudiante.class, name = "Estudiante"),
-    @JsonSubTypes.Type(value = Profesor.class, name = "Profesor")
+    @JsonSubTypes.Type(value = Estudiante.class, name = "estudiante"),
+    @JsonSubTypes.Type(value = Profesor.class, name = "profesor")
 })
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -44,18 +45,26 @@ public abstract class Usuario implements UserDetails {
     @Column(nullable = false)
     private String nombre;
 
-    @Column
+    @Column(name = "git_username")
     private String gitUsername;
 
-    @Column
+    @Column(name = "taiga_username")
     private String taigaUsername;
 
+    @Column(name = "taiga_user_id")
+    private Integer taigaId;
+
+    @Column(name = "github_token")
+    private String githubAccessToken;
+
     @Enumerated(EnumType.STRING)
-    private Role role;
+    @Column(name = "rol", insertable = false, updatable = false) // Evitamos duplicar la columna con el discriminador
+    private Rol rol;
+
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(role.name()));
+        return List.of(new SimpleGrantedAuthority(rol.name()));
     }
 
     @Override
@@ -83,9 +92,8 @@ public abstract class Usuario implements UserDetails {
         return true;
     }
 
-    // Necesitas definir cómo manejar las contraseñas para Spring Security:
     @Override
     public String getPassword() {
-        return null; // Asumimos que se usará autenticación con Google.
+        return null; // Auth con google no requiere guardar la contraseña
     }
 }

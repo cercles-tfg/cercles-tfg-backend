@@ -1,17 +1,24 @@
 package tfg.backend_tfg.model;
 
+import java.util.List;
+
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-
 @Entity
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "profesor")
 public class Profesor extends Usuario {
-    // Similar para la clase Profesor.
+
+    // Relación con cursos a través de ProfesorCurso
+    @OneToMany(mappedBy = "profesor", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfesorCurso> cursos;
 }

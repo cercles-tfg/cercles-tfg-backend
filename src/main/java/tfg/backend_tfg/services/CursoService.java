@@ -251,15 +251,13 @@ public class CursoService {
 
         // Crear las evaluaciones y asociarlas al curso
         List<Evaluacion> evaluaciones = evaluacionRequests.stream()
-                .map(evaluacionRequest -> {
-                    Evaluacion evaluacion = new Evaluacion();
-                    evaluacion.setFechaInicio(evaluacionRequest.getFechaInicio());
-                    evaluacion.setFechaFin(evaluacionRequest.getFechaFin());
-                    evaluacion.setCurso(curso);
-                    return evaluacion;
-                })
-                .toList();
-
+        .map(evaluacionRequest -> Evaluacion.builder()
+                .fechaInicio(evaluacionRequest.getFechaInicio())
+                .fechaFin(evaluacionRequest.getFechaFin())
+                .curso(curso)
+                .build()
+        )
+        .toList();
         // Guardar todas las evaluaciones en la base de datos
         evaluacionRepository.saveAll(evaluaciones);
 

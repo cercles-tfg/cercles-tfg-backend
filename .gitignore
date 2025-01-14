@@ -33,5 +33,4 @@ build/
 .vscode/
 
 ## Secret properties ##
-/src/main/resources/application-secret.properties
-/src/main/resources/keys
+## POR SEGURIDAD, MEJOR MANTENER SECRETO /src/main/resources/application-secret.properties
